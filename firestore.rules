@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// Phase 0 rules: single-school. Phase 1 moves data under schools/{schoolId}
+// and adds a schoolId check to every rule.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Role comes from the `role` custom claim, set with `npm run set-role`.
+    function isAdmin() {
+      return signedIn() && request.auth.token.role in ['superAdmin', 'owner', 'staff'];
+    }
+
+    // Must stay in sync with packages/shared/src/enquiry.ts
+    function validNewEnquiry(d) {
+      return d.keys().hasOnly(['name', 'phone', 'course', 'preferredTime', 'status', 'createdAt'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 80
+        && d.phone is string && d.phone.matches('^[0-9]{10}$')
+        && d.course in ['Beginner Car Driving', 'Practical Driving Training', 'Confidence Building', 'Traffic & Road Practice']
+        && d.preferredTime in ['Morning', 'Afternoon', 'Evening', 'Flexible']
+        && d.status == 'New'
+        && d.createdAt == request.time;
+    }
+
+    match /enquiries/{enquiryId} {
+      // Anyone (logged in or not) can submit the public enquiry form, but only valid data.
+      allow create: if validNewEnquiry(request.resource.data);
+
+      // Only school admins can see leads (they contain phone numbers).
+      allow read: if isAdmin();
+
+      // Admins can change the status and nothing else.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['New', 'Contacted', 'Enrolled'];
+
+      allow delete: if request.auth.token.role in ['superAdmin', 'owner'];
+    }
+
+    // Everything else is closed until a later phase opens it on purpose.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

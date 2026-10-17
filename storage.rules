@@ -1,0 +1,10 @@
+rules_version = '2';
+
+// Nothing uses Storage yet. Phase 4 (documents) opens specific paths.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

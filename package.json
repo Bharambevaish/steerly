@@ -1,0 +1,19 @@
+{
+  "name": "steerly",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "admin": "npm run dev -w steerly-admin",
+    "mobile": "npm run start -w steerly-student",
+    "build:admin": "npm run build -w steerly-admin",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "set-role": "node scripts/set-role.mjs"
+  },
+  "devDependencies": {
+    "firebase-admin": "^14.5.0"
+  }
+}

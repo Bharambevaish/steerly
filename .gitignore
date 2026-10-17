@@ -40,3 +40,8 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Firebase
+.firebase/
+*-debug.log
+service-account*.json

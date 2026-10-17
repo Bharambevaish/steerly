@@ -10,26 +10,26 @@ import {
   Platform,
   ActivityIndicator,
   Modal,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { COLLECTIONS, COURSES, PREFERRED_TIMES, enquiryInputSchema } from '@steerly/shared';
 import { db } from './firebase';
 
-const COURSES = [
-  'Beginner Car Driving',
-  'Practical Driving Training',
-  'Confidence Building',
-  'Traffic & Road Practice',
-];
-
-const PREFERRED_TIMES = ['Morning', 'Afternoon', 'Evening', 'Flexible'];
-
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <EnquiryScreen />
+    </SafeAreaProvider>
+  );
+}
+
+function EnquiryScreen() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [course, setCourse] = useState('');
-  const [preferredTime, setPreferredTime] = useState('');
+  const [course, setCourse] = useState<string>('');
+  const [preferredTime, setPreferredTime] = useState<string>('');
 
   // Modals for selection
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -43,37 +43,17 @@ export default function App() {
   const handleSubmit = async () => {
     setErrorMessage('');
 
-    const trimmedName = name.trim();
-    const cleanedPhone = phone.trim().replace(/\D/g, '');
-
-    if (!trimmedName) {
-      setErrorMessage('Please enter your full name.');
-      return;
-    }
-
-    if (cleanedPhone.length !== 10) {
-      setErrorMessage('Please enter a valid 10-digit phone number.');
-      return;
-    }
-
-    if (!course) {
-      setErrorMessage('Please select a preferred course.');
-      return;
-    }
-
-    if (!preferredTime) {
-      setErrorMessage('Please select your preferred time.');
+    const parsed = enquiryInputSchema.safeParse({ name, phone, course, preferredTime });
+    if (!parsed.success) {
+      setErrorMessage(parsed.error.issues[0]?.message ?? 'Please check the form.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      await addDoc(collection(db, 'enquiries'), {
-        name: trimmedName,
-        phone: cleanedPhone,
-        course,
-        preferredTime,
+      await addDoc(collection(db, COLLECTIONS.enquiries), {
+        ...parsed.data,
         status: 'New',
         createdAt: serverTimestamp(),
       });
@@ -84,11 +64,10 @@ export default function App() {
       setCourse('');
       setPreferredTime('');
       setIsSubmitted(true);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Submission error:', error);
       setErrorMessage(
-        error?.message ||
-          'Failed to submit enquiry. Please check your internet connection and try again.'
+        'Failed to submit enquiry. Please check your internet connection and try again.'
       );
     } finally {
       setIsSubmitting(false);
@@ -352,7 +331,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingTop: Platform.OS === 'android' ? 40 : 20,
     alignItems: 'center',
   },
   header: {

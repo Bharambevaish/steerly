@@ -101,14 +101,20 @@ Security rules: a user can only read/write data where `schoolId` matches their c
 Estimated times are for one developer working full-time.
 
 ### Phase 0 — Foundation & security (1 week)
-- [ ] `git init`, push to a private GitHub repo
-- [ ] Rename the folder to `steerly`, convert to the monorepo layout above
-- [ ] Create Firebase projects `steerly-dev` and `steerly-prod`; move config to `.env`; delete `SDKs -or-the-products.txt`
-- [ ] Write `firestore.rules` + `storage.rules` and deploy them (close the open database)
-- [ ] Admin login (email + password) and route protection
-- [ ] Enable App Check
-- [ ] Shared package with the types and Zod schemas
-- [ ] Set `android.package` / `ios.bundleIdentifier` (e.g. `app.steerly.student`)
+- [x] `git init` (branch `phase-0/foundation`)
+- [ ] Push to a private GitHub repo *(you)*
+- [x] Convert to the monorepo layout above (npm workspaces)
+- [ ] Rename the folder to `steerly` *(you, with editors/Expo closed)*
+- [x] Move config to `.env.local` files; delete `SDKs -or-the-products.txt`
+- [ ] Create Firebase projects `steerly-dev` and `steerly-prod` *(you, in the Firebase console)*
+- [x] Write `firestore.rules` + `storage.rules`
+- [ ] Deploy the rules *(you: `firebase deploy --only firestore:rules,storage`)*
+- [x] Admin login (email + password), role check, route protection, `npm run set-role` script
+- [x] App Check wired into admin (turns on when `VITE_APPCHECK_RECAPTCHA_SITE_KEY` is set)
+- [ ] App Check on mobile — needs `@react-native-firebase` + a dev build, moved to Phase 2
+- [x] Shared package with the types and Zod schemas
+- [x] Set `android.package` / `ios.bundleIdentifier` (`app.steerly.student`)
+- [x] Replace deprecated `SafeAreaView` with `react-native-safe-area-context`
 
 **Done when:** nobody can read data without logging in, and both apps run from the monorepo.
 

@@ -8,7 +8,9 @@ import {
   updateDoc,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { COLLECTIONS, type EnquiryStatus } from '@steerly/shared';
+import { db } from '../firebase';
+import { useAuth } from '../auth/AuthProvider';
 
 export interface Enquiry {
   id: string;
@@ -16,7 +18,7 @@ export interface Enquiry {
   phone: string;
   course: string;
   preferredTime: string;
-  status: 'New' | 'Contacted' | 'Enrolled';
+  status: EnquiryStatus;
   createdAt?: Timestamp | null;
 }
 
@@ -35,15 +37,16 @@ function formatTimeAgo(timestamp?: Timestamp | null): string {
   return `${days}d ago`;
 }
 
-export default function App() {
+export default function EnquiriesPage() {
+  const { user, signOut } = useAuth();
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'All' | 'New' | 'Contacted' | 'Enrolled'>('All');
+  const [filter, setFilter] = useState<'All' | EnquiryStatus>('All');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     // Real-time Firestore subscription ordered by createdAt descending
-    const q = query(collection(db, 'enquiries'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, COLLECTIONS.enquiries), orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(
       q,
@@ -75,11 +78,11 @@ export default function App() {
 
   const handleStatusChange = async (
     id: string,
-    newStatus: 'New' | 'Contacted' | 'Enrolled'
+    newStatus: EnquiryStatus
   ) => {
     setUpdatingId(id);
     try {
-      const enquiryDoc = doc(db, 'enquiries', id);
+      const enquiryDoc = doc(db, COLLECTIONS.enquiries, id);
       await updateDoc(enquiryDoc, { status: newStatus });
     } catch (err) {
       console.error('Failed to update enquiry status:', err);
@@ -119,6 +122,13 @@ export default function App() {
               <span className="w-2 h-2 mr-2 rounded-full bg-emerald-400 animate-ping"></span>
               Live Sync
             </span>
+            <span className="hidden md:inline text-xs text-slate-400">{user?.email}</span>
+            <button
+              onClick={signOut}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-700"
+            >
+              Sign out
+            </button>
           </div>
         </div>
       </header>

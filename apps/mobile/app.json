@@ -2,14 +2,17 @@
   "expo": {
     "name": "Steerly",
     "slug": "steerly",
-    "version": "1.0.0",
+    "scheme": "steerly",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "app.steerly.student"
     },
     "android": {
+      "package": "app.steerly.student",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
