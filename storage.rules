@@ -1,8 +1,41 @@
 rules_version = '2';
 
-// Nothing uses Storage yet. Phase 4 (documents) opens specific paths.
+// Paths are built by helpers in packages/shared/src/firestore.ts.
 service firebase.storage {
   match /b/{bucket}/o {
+
+    function signedIn() { return request.auth != null; }
+    function role() { return signedIn() ? request.auth.token.get('role', '') : ''; }
+    function inSchool(schoolId) {
+      return role() == 'superAdmin' || (signedIn() && request.auth.token.get('schoolId', '') == schoolId);
+    }
+    function isAdmin(schoolId) { return role() == 'superAdmin' || (inSchool(schoolId) && role() in ['owner', 'staff']); }
+    function isOwner(schoolId) { return role() == 'superAdmin' || (inSchool(schoolId) && role() == 'owner'); }
+    function isMyStudentFolder(schoolId, studentId) {
+      return inSchool(schoolId) && role() == 'student' && request.auth.token.get('studentId', '') == studentId;
+    }
+    function okUpload(maxMb, typeRegex) {
+      return request.resource.size < maxMb * 1024 * 1024
+        && request.resource.contentType.matches(typeRegex);
+    }
+
+    // School logo: public read, owner write.
+    match /schools/{schoolId}/branding/{file} {
+      allow read: if true;
+      allow write: if isOwner(schoolId) && okUpload(2, 'image/.*');
+    }
+
+    // Student documents: the student and the school's admins/instructors.
+    match /schools/{schoolId}/students/{studentId}/{file} {
+      allow read: if isAdmin(schoolId)
+        || (inSchool(schoolId) && role() == 'instructor')
+        || isMyStudentFolder(schoolId, studentId);
+      allow create: if (isAdmin(schoolId) || isMyStudentFolder(schoolId, studentId))
+        && okUpload(10, 'image/.*|application/pdf');
+      allow delete: if isAdmin(schoolId) || isMyStudentFolder(schoolId, studentId);
+    }
+
+    // Receipts are written by functions and served via signed URLs only.
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -8,3 +8,10 @@ export const ADMIN_ROLES: readonly Role[] = ['superAdmin', 'owner', 'staff'];
 export function isAdminRole(role: unknown): role is Role {
   return typeof role === 'string' && (ADMIN_ROLES as readonly string[]).includes(role);
 }
+
+/** Custom claims set by Cloud Functions on every user's ID token. */
+export interface SteerlyClaims {
+  role?: Role;
+  schoolId?: string; // absent for superAdmin and for users not yet in a school
+  studentId?: string; // only for role === 'student'
+}

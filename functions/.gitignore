@@ -1,0 +1,4 @@
+lib/
+.env.*
+!.env.example
+.secret.local

@@ -1,46 +1,192 @@
 rules_version = '2';
 
-// Phase 0 rules: single-school. Phase 1 moves data under schools/{schoolId}
-// and adds a schoolId check to every rule.
+// Multi-tenant rules. Every user's ID token carries custom claims set by Cloud Functions:
+//   role:      superAdmin | owner | staff | instructor | student
+//   schoolId:  the school they belong to (absent for superAdmin)
+//   studentId: their student doc id (students only)
+// Anything that moves money, assigns roles or books slots is done by Cloud Functions
+// (Admin SDK bypasses these rules). Clients only get the direct access listed here.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
-      return request.auth != null;
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function claims() { return request.auth.token; }
+    function role() { return signedIn() ? claims().get('role', '') : ''; }
+    function isSuperAdmin() { return role() == 'superAdmin'; }
+    function inSchool(schoolId) {
+      return isSuperAdmin() || (signedIn() && claims().get('schoolId', '') == schoolId);
+    }
+    function isOwner(schoolId) { return isSuperAdmin() || (inSchool(schoolId) && role() == 'owner'); }
+    function isAdmin(schoolId) { return isSuperAdmin() || (inSchool(schoolId) && role() in ['owner', 'staff']); }
+    function isStaffOrInstructor(schoolId) {
+      return isAdmin(schoolId) || (inSchool(schoolId) && role() == 'instructor');
+    }
+    function isInstructor(schoolId) { return inSchool(schoolId) && role() == 'instructor'; }
+    function isStudent(schoolId) { return inSchool(schoolId) && role() == 'student'; }
+    function myStudentId() { return claims().get('studentId', ''); }
+    function onlyChanges(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+    function schoolActive(schoolId) {
+      return get(/databases/$(database)/documents/schools/$(schoolId)).data.subscription.status
+        in ['trial', 'active', 'past_due'];
     }
 
-    // Role comes from the `role` custom claim, set with `npm run set-role`.
-    function isAdmin() {
-      return signedIn() && request.auth.token.role in ['superAdmin', 'owner', 'staff'];
+    // ---------- users ----------
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isSuperAdmin());
+      // Users may only update their display name and push token. Everything else is set by functions.
+      allow update: if signedIn() && request.auth.uid == uid && onlyChanges(['name', 'expoPushToken']);
+
+      match /notifications/{notificationId} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow update: if signedIn() && request.auth.uid == uid && onlyChanges(['read']);
+        allow delete: if signedIn() && request.auth.uid == uid;
+      }
     }
 
-    // Must stay in sync with packages/shared/src/enquiry.ts
+    // Public lookup of join codes (contains only schoolId + name).
+    match /schoolCodes/{code} {
+      allow get: if true;
+    }
+
+    // Public lookup of web slugs (contains only schoolId + name).
+    match /schoolSlugs/{slug} {
+      allow get: if true;
+    }
+
+    // ---------- schools ----------
+    match /schools/{schoolId} {
+      // Public: school profile (name, logo, colour) is needed by the public enquiry form and app branding.
+      allow get: if true;
+      allow list: if isSuperAdmin();
+      // Owners edit the profile and settings; plan/status/code/owner are function-only.
+      allow update: if isOwner(schoolId)
+        && onlyChanges(['name', 'logoUrl', 'brandColor', 'phone', 'email', 'address', 'city', 'settings']);
+
+      match /members/{uid} {
+        allow read: if isStaffOrInstructor(schoolId);
+        // Owners can edit a member's display name/phone; role & active go through updateMember.
+        allow update: if isOwner(schoolId) && onlyChanges(['name', 'phone', 'email']);
+      }
+
+      match /invites/{phone} {
+        allow read: if isAdmin(schoolId);
+        allow delete: if isOwner(schoolId);
+      }
+
+      match /branches/{branchId} {
+        allow read: if inSchool(schoolId);
+        allow create, update, delete: if isOwner(schoolId);
+      }
+
+      match /courses/{courseId} {
+        // Public so prospective students can browse prices before signing up.
+        allow read: if true;
+        allow create, update, delete: if isAdmin(schoolId);
+      }
+
+      match /enquiries/{enquiryId} {
+        allow create: if validNewEnquiry(request.resource.data) && schoolActive(schoolId);
+        // Admins can log walk-in / phone / referral leads with notes and a follow-up date.
+        allow create: if isAdmin(schoolId) && validAdminEnquiry(request.resource.data);
+        allow read: if isAdmin(schoolId);
+        allow update: if isAdmin(schoolId)
+          && onlyChanges(['status', 'notes', 'followUpAt', 'updatedAt', 'courseId', 'courseName', 'preferredTime'])
+          && request.resource.data.status in ['New', 'Contacted', 'Enrolled', 'Lost'];
+        allow delete: if isOwner(schoolId);
+      }
+
+      match /students/{studentId} {
+        allow read: if isStaffOrInstructor(schoolId)
+          || (isStudent(schoolId) && myStudentId() == studentId);
+        // Admins manage the student record but never the money or link fields.
+        allow update: if isAdmin(schoolId)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['feePaid', 'uid', 'id', 'createdAt', 'referralCode']);
+        // Students can edit their own contact details only.
+        allow update: if isStudent(schoolId) && myStudentId() == studentId
+          && onlyChanges(['email', 'address', 'dob']);
+        allow delete: if isOwner(schoolId);
+
+        match /documents/{docId} {
+          allow read: if isStaffOrInstructor(schoolId)
+            || (isStudent(schoolId) && myStudentId() == studentId);
+          allow create: if (isAdmin(schoolId) || (isStudent(schoolId) && myStudentId() == studentId))
+            && request.resource.data.verified == false
+            && request.resource.data.uploadedBy == request.auth.uid;
+          allow update: if isAdmin(schoolId) && onlyChanges(['verified', 'type']);
+          allow delete: if isAdmin(schoolId)
+            || (isStudent(schoolId) && myStudentId() == studentId && resource.data.verified == false);
+        }
+      }
+
+      match /vehicles/{vehicleId} {
+        allow read: if isStaffOrInstructor(schoolId);
+        allow create, update, delete: if isAdmin(schoolId);
+      }
+
+      match /availability/{instructorId} {
+        allow read: if isStaffOrInstructor(schoolId);
+        allow write: if isAdmin(schoolId) || (isInstructor(schoolId) && request.auth.uid == instructorId);
+      }
+
+      match /slots/{slotId} {
+        allow read: if inSchool(schoolId);
+        // Admins/instructors may block or unblock open slots directly. Booking is function-only.
+        allow update: if (isAdmin(schoolId) || (isInstructor(schoolId) && resource.data.instructorId == request.auth.uid))
+          && onlyChanges(['status'])
+          && resource.data.status in ['open', 'blocked']
+          && request.resource.data.status in ['open', 'blocked'];
+        allow delete: if isAdmin(schoolId) && resource.data.status != 'booked';
+      }
+
+      match /bookings/{bookingId} {
+        allow read: if isAdmin(schoolId)
+          || (isInstructor(schoolId) && resource.data.instructorId == request.auth.uid)
+          || (isStudent(schoolId) && resource.data.studentId == myStudentId());
+      }
+
+      match /payments/{paymentId} {
+        allow read: if isAdmin(schoolId)
+          || (isStudent(schoolId) && resource.data.studentId == myStudentId());
+      }
+
+      // counters are function-only (no client access)
+    }
+
+    // Must stay in sync with enquiryInputSchema in packages/shared/src/enquiry.ts
     function validNewEnquiry(d) {
-      return d.keys().hasOnly(['name', 'phone', 'course', 'preferredTime', 'status', 'createdAt'])
+      return d.keys().hasOnly(['name', 'phone', 'courseId', 'courseName', 'preferredTime', 'source',
+                               'status', 'notes', 'followUpAt', 'studentId', 'createdAt', 'updatedAt'])
         && d.name is string && d.name.size() > 0 && d.name.size() <= 80
-        && d.phone is string && d.phone.matches('^[0-9]{10}$')
-        && d.course in ['Beginner Car Driving', 'Practical Driving Training', 'Confidence Building', 'Traffic & Road Practice']
+        && d.phone is string && d.phone.matches('^[6-9][0-9]{9}$')
+        && (d.courseId == null || (d.courseId is string && d.courseId.size() <= 64))
+        && d.courseName is string && d.courseName.size() > 0 && d.courseName.size() <= 80
         && d.preferredTime in ['Morning', 'Afternoon', 'Evening', 'Flexible']
+        && d.source in ['app', 'web']
         && d.status == 'New'
+        && d.get('notes', '') == ''
+        && d.get('followUpAt', null) == null
+        && d.get('studentId', null) == null
+        && d.get('updatedAt', null) == null
         && d.createdAt == request.time;
     }
 
-    match /enquiries/{enquiryId} {
-      // Anyone (logged in or not) can submit the public enquiry form, but only valid data.
-      allow create: if validNewEnquiry(request.resource.data);
-
-      // Only school admins can see leads (they contain phone numbers).
-      allow read: if isAdmin();
-
-      // Admins can change the status and nothing else.
-      allow update: if isAdmin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-        && request.resource.data.status in ['New', 'Contacted', 'Enrolled'];
-
-      allow delete: if request.auth.token.role in ['superAdmin', 'owner'];
+    function validAdminEnquiry(d) {
+      return d.keys().hasOnly(['name', 'phone', 'courseId', 'courseName', 'preferredTime', 'source',
+                               'status', 'notes', 'followUpAt', 'studentId', 'createdAt', 'updatedAt'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 80
+        && d.phone is string && d.phone.matches('^[6-9][0-9]{9}$')
+        && d.courseName is string && d.courseName.size() <= 80
+        && d.source in ['app', 'web', 'walk_in', 'phone', 'referral']
+        && d.status in ['New', 'Contacted', 'Lost']
+        && d.get('studentId', null) == null
+        && d.createdAt == request.time;
     }
 
-    // Everything else is closed until a later phase opens it on purpose.
+    // Everything else is closed.
     match /{document=**} {
       allow read, write: if false;
     }
