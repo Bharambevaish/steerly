@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions/v2';
@@ -190,11 +191,26 @@ export const getReceiptUrl = callable(getReceiptUrlSchema, async (data, request)
     path = await saveReceiptPdf(data.schoolId, school, student, payment);
     await subDoc(data.schoolId, 'payments', payment.id).update({ receiptPath: path });
   }
-  const [url] = await bucket()
-    .file(path)
-    .getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 15 * 60_000 });
-  return { url };
+  return { url: await receiptDownloadUrl(path) };
 });
+
+/** 15-minute signed URL in production. The emulator has no credentials to sign with, so there
+ * we fall back to a Firebase download-token URL served by the Storage emulator. */
+async function receiptDownloadUrl(path: string): Promise<string> {
+  const file = bucket().file(path);
+  const emulatorHost = process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+  if (process.env.FUNCTIONS_EMULATOR === 'true' && emulatorHost) {
+    const [meta] = await file.getMetadata();
+    let token = String(meta.metadata?.firebaseStorageDownloadTokens ?? '').split(',')[0];
+    if (!token) {
+      token = randomUUID();
+      await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
+    }
+    return `http://${emulatorHost}/v0/b/${file.bucket.name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+  }
+  const [url] = await file.getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 15 * 60_000 });
+  return url;
+}
 
 // ---------- Webhook ----------
 

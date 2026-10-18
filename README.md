@@ -46,6 +46,19 @@ Other scripts: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build:a
 
 Note: typed routes are off in `apps/mobile/app.json` because npm keeps `expo-router` inside `apps/mobile/node_modules` in this workspace layout; the app runs and bundles normally.
 
+## Test everything locally (Firebase emulators)
+
+Needs **Java 21+** (`java -version`). No Firebase account needed: the emulators use the offline demo project `demo-steerly`.
+
+1. One time: `functions/.env.local` and `functions/.secret.local` hold dev values (see `functions/README.md`). OTPs are shown on screen instead of sent by SMS.
+2. Terminal 1:
+   ```powershell
+   $env:FUNCTIONS_DISCOVERY_TIMEOUT=60   # OneDrive makes the first load slow
+   npm run emulators                     # UI at http://127.0.0.1:4000
+   ```
+3. Terminal 2: `npm run e2e` runs the 48-step end-to-end test (onboarding → leads → students → booking → lessons → payments + webhook → reports → account deletion → multi-school isolation).
+4. Optional: `npm run admin:emulator` opens the dashboard against the emulators; sign in with any phone number and the code shown on screen. After `npm run e2e`, the owner of the test school is `91<run id>000`, e.g. run `08129` → `9108129000`.
+
 ## Admin access
 
 The dashboard only lets in users whose Firebase Auth token has `role` = `superAdmin`, `owner` or `staff`.

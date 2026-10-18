@@ -15,9 +15,13 @@
     "set-role": "node scripts/set-role.mjs",
     "web": "npm run dev -w steerly-web",
     "build:functions": "npm run build -w steerly-functions",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "emulators": "npm run build:functions && firebase emulators:start --project demo-steerly --only auth,functions,firestore,storage",
+    "e2e": "node scripts/e2e.mjs",
+    "admin:emulator": "npm run dev:emulator -w steerly-admin"
   },
   "devDependencies": {
-    "firebase-admin": "^14.5.0"
+    "firebase-admin": "^14.5.0",
+    "firebase-tools": "^15.34.0"
   }
 }

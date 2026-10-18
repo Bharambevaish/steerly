@@ -72,4 +72,4 @@ Status: ⬜ to do · ✅ done
 
 ---
 
-_Last updated by Claude: all 4 parts built; final checks._
+_Last updated by Claude: all parts built; end-to-end test passes 48/48 on the local emulators. Everything above is what's left before real users._
