@@ -7,10 +7,12 @@ Steerly is a white-label platform for driving schools: a mobile app for students
 ```
 steerly/                    npm workspaces monorepo
 ├── apps/
-│   ├── mobile/             Expo (React Native) app — package: steerly-student
-│   └── admin/              React + Vite + Tailwind dashboard — package: steerly-admin
+│   ├── mobile/             Expo Router app for students + instructors — package: steerly-student
+│   ├── admin/              React + Vite + Tailwind school dashboard + super-admin — package: steerly-admin
+│   └── web/                Marketing site, public school pages, legal pages — package: steerly-web
 ├── packages/
 │   └── shared/             @steerly/shared: types, Zod schemas, roles, collection names
+├── functions/              Firebase Cloud Functions (OTP, booking, payments, receipts, reminders) — see functions/README.md
 ├── scripts/set-role.mjs    Give a user an admin role (custom claim)
 ├── firestore.rules         Firestore security rules
 ├── storage.rules           Storage security rules
@@ -27,15 +29,22 @@ Create the env files (they are git-ignored) from the examples and fill in the va
 
 - `apps/admin/.env.example` → `apps/admin/.env.local`
 - `apps/mobile/.env.example` → `apps/mobile/.env.local`
+- `apps/web/.env.example` → `apps/web/.env.local`
+- `functions/.env.example` → `functions/.env.<projectId>`
+
+**Everything you need to set up is in [USER_TODO.md](USER_TODO.md).** Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Run
 
 ```bash
 npm run admin       # dashboard at http://localhost:5173
 npm run mobile      # Expo dev server; scan the QR code with Expo Go
+npm run web         # website at http://localhost:5174
 ```
 
-Other scripts: `npm run typecheck`, `npm run lint`, `npm run build:admin`.
+Other scripts: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build:admin`, `npm run build:functions`.
+
+Note: typed routes are off in `apps/mobile/app.json` because npm keeps `expo-router` inside `apps/mobile/node_modules` in this workspace layout; the app runs and bundles normally.
 
 ## Admin access
 

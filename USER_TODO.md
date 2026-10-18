@@ -42,6 +42,10 @@ Status: ⬜ to do · ✅ done
 
 | B9 | *(Optional, WhatsApp)* AiSensy account → create 3 API campaigns with approved templates, put names in `WHATSAPP_CAMPAIGN_LESSON_REMINDER/PAYMENT_LINK/RECEIPT`, set `WHATSAPP_ENABLED=true`:<br>1. Lesson reminder: "Hi {{1}}, reminder: your driving lesson with {{2}} is at {{3}}. – {{4}}" (student, instructor, time, school)<br>2. Payment link: "Hi {{1}}, please pay {{2}} for {{3}} at {{4}} using this secure link: {{5}}" (student, amount, course, school, link)<br>3. Receipt: "Hi {{1}}, we received {{2}} at {{3}}. Receipt no. {{4}}. Balance due: {{5}}. Thank you!" (student, amount, school, receipt no, balance) | ⬜ |
 
+| B10 | Mobile: `cd apps/mobile && npx eas init`, then put the project id in `EAS_PROJECT_ID` in `apps/mobile/.env.local`. Set `EXPO_PUBLIC_ADMIN_URL` to your live admin URL | ⬜ |
+| B11 | Push notifications: in expo.dev → your project → Credentials, upload the **FCM v1** service-account key (Android) and, for iOS later, APNs. Push does **not** work in Expo Go — test with a development build: `npx eas build -p android --profile development` | ⬜ |
+| B12 | White-label app for a school (e.g. Prince): build with `EXPO_PUBLIC_SCHOOL_ID=<schoolId>`, `EXPO_PUBLIC_APP_NAME="Prince Driving School"`, `APP_BUNDLE_ID=app.steerly.prince` and its own icon | ⬜ |
+
 ## C. Before going live
 
 | # | Task | Status |
@@ -68,4 +72,4 @@ Status: ⬜ to do · ✅ done
 
 ---
 
-_Last updated by Claude: backend, website, admin done; mobile in progress._
+_Last updated by Claude: all 4 parts built; final checks._

@@ -98,6 +98,8 @@ Security rules: a user can only read/write data where `schoolId` matches their c
 
 ## 4. Phases
 
+> **Status (2026-10-18):** all code for Phases 1–6 is written and passes typecheck, unit tests and builds. It has **not** run against a real Firebase project yet; that needs the setup in [USER_TODO.md](USER_TODO.md). Remaining: your setup tasks, then end-to-end testing on the emulator / a device.
+
 Estimated times are for one developer working full-time.
 
 ### Phase 0 — Foundation & security (1 week)
