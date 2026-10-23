@@ -51,7 +51,7 @@ Status: ⬜ to do · ✅ done
 | # | Task | Status |
 |---|---|---|
 | C1 | Close VS Code/Expo, then rename the folder `prince-driving-school-app` → `steerly`. Moving it out of OneDrive (e.g. `C:\dev\steerly`) makes installs ~5× faster | ⬜ |
-| C2 | Design the real logo + app icon (1024×1024) and splash; replace files in `apps/mobile/assets` | ⬜ |
+| C2 | *(Optional)* A Steerly logo, app icons, splash and share image are already made (`scripts/brand/src/*.svg`). To use your own designer's logo: replace `mark.svg`, `mark-mono.svg`, `app-icon.svg` (64×64 box, centred), then run `npm run brand` | ⬜ |
 | C3 | Review the Privacy Policy & Terms pages on the website with a lawyer (DPDP Act 2023) | ⬜ |
 | C4 | Create Prince Driving School as the first school (sign up in the admin, add courses, instructors, vehicles) | ⬜ |
 | C5 | Build the Android app: `cd apps/mobile && npx eas build -p android --profile production`, upload to Play Console internal testing | ⬜ |
@@ -67,9 +67,9 @@ Status: ⬜ to do · ✅ done
 | D3 | Fill the `[brackets]` in `apps/web/src/pages/legal/LegalLayout.tsx`: company name & address, grievance officer, retention periods, city for jurisdiction | ⬜ |
 | D4 | Create real mailboxes: hello@, privacy@, grievance@ your domain | ⬜ |
 | D5 | Confirm the promises in the website copy: 90-day data retention after cancellation, 30-day deletion, "call back within one working day", help importing spreadsheets | ⬜ |
-| D6 | Social share image 1200×630 PNG → `apps/web/public/og.png` (Claude will wire the tag) | ⬜ |
+| D6 | ~~Social share image~~ — done by Claude (`apps/web/public/og.png`) | ✅ |
 | D7 | After publishing: put the Play Store link in `VITE_PLAY_STORE_URL` and the live admin URL in `VITE_ADMIN_URL` (`apps/web/.env.local`) | ⬜ |
 
 ---
 
-_Last updated by Claude: all parts built; end-to-end test passes 48/48 on the local emulators. Everything above is what's left before real users._
+_Last updated by Claude (2026-10-23): brand assets + admin updates committed. Backend (teaches/rename sync/scheduled-job tests/seed) and mobile (EAS/web/offline/teaches) work was paused by the usage limit and is UNCOMMITTED in functions/, scripts/, apps/mobile/ — Claude will verify and commit it next session._
