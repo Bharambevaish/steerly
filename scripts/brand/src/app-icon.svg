@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Steerly mark on the rounded-square app tile (deep slate). Also used as favicon.svg. -->
+  <defs>
+    <linearGradient id="steerly-g" x1="12" y1="12" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBBF24"/>
+      <stop offset="1" stop-color="#F97316"/>
+    </linearGradient>
+    <radialGradient id="steerly-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(20 14) rotate(50) scale(52)">
+      <stop stop-color="#1E293B"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#steerly-glow)"/>
+  <path d="M48.11 21.93A19 19 0 0 0 13 32H26M38 32H51A19 19 0 0 1 15.89 42.07" stroke="url(#steerly-g)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M32 26.25a5.75 5.75 0 1 1 0 11.5a5.75 5.75 0 1 1 0-11.5zm0 3.5a2.25 2.25 0 1 0 0 4.5a2.25 2.25 0 1 0 0-4.5z" fill="url(#steerly-g)" fill-rule="evenodd"/>
+</svg>

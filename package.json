@@ -18,7 +18,8 @@
     "test": "npm run test --workspaces --if-present",
     "emulators": "npm run build:functions && firebase emulators:start --project demo-steerly --only auth,functions,firestore,storage",
     "e2e": "node scripts/e2e.mjs",
-    "admin:emulator": "npm run dev:emulator -w steerly-admin"
+    "admin:emulator": "npm run dev:emulator -w steerly-admin",
+    "brand": "node scripts/brand/generate.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
