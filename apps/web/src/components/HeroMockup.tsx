@@ -95,7 +95,7 @@ function Phone() {
 function DashboardCard() {
   const bars = [38, 52, 46, 70, 62, 84, 78];
   return (
-    <div className="glass w-[300px] p-5 sm:w-[320px]">
+    <div className="glass w-[300px] !bg-white/95 p-5 sm:w-[320px] dark:!bg-slate-900/95">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">This month</p>
         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
@@ -146,7 +146,7 @@ export function HeroMockup() {
       <div className="absolute -bottom-2 left-1/2 hidden -translate-x-[95%] motion-safe:animate-fade-up sm:block lg:left-0 lg:translate-x-0 [animation-delay:300ms]">
         <DashboardCard />
       </div>
-      <div className="glass absolute right-0 top-10 hidden items-center gap-3 px-4 py-3 motion-safe:animate-fade-up sm:flex [animation-delay:500ms]">
+      <div className="glass absolute right-0 top-10 hidden !bg-white/95 dark:!bg-slate-900/95 items-center gap-3 px-4 py-3 motion-safe:animate-fade-up sm:flex [animation-delay:500ms]">
         <span className="grid h-9 w-9 place-items-center rounded-full bg-amber-400/20 text-amber-700 dark:text-amber-300">
           <CalendarClock className="h-5 w-5" />
         </span>
