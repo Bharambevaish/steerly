@@ -3,7 +3,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { Save } from 'lucide-react';
 import { phoneSchema, schoolCol, type StudentStatus, type TestStatus } from '@steerly/shared';
 import { db } from '../../lib/firebase';
-import { useSchool, useSchoolId } from '../../lib/school';
+import { instructorLabel, useSchool, useSchoolId } from '../../lib/school';
 import { fmt, TEST_STATUS_LABELS, toPaise, tsToYmd, ymdToTs } from '../../lib/format';
 import { Button, Card, FormField, Input, Select, Textarea } from '../../components/ui';
 import { useToast } from '../../components/Toast';
@@ -61,7 +61,7 @@ export default function OverviewTab({ student }: StudentTabProps) {
         courseId: f.courseId,
         courseName: course?.name ?? student.courseName,
         instructorId: f.instructorId || null,
-        instructorName: instructor?.name ?? null,
+        instructorName: f.instructorId ? (instructor?.name ?? student.instructorName ?? null) : null,
         branchId: f.branchId || null,
         feeTotal: toPaise(Number(f.feeTotal) || 0),
         sessionsTotal: Math.max(0, Math.round(Number(f.sessionsTotal) || 0)),
@@ -119,9 +119,12 @@ export default function OverviewTab({ student }: StudentTabProps) {
             <FormField label="Instructor">
               <Select value={f.instructorId} onChange={set('instructorId')}>
                 <option value="">Unassigned</option>
+                {f.instructorId && !instructors.some((m) => m.uid === f.instructorId) && (
+                  <option value={f.instructorId}>{student.instructorName ?? 'Previous instructor'} (inactive)</option>
+                )}
                 {instructors.map((m) => (
                   <option key={m.uid} value={m.uid}>
-                    {m.name}
+                    {instructorLabel(m)}
                   </option>
                 ))}
               </Select>
@@ -137,10 +140,10 @@ export default function OverviewTab({ student }: StudentTabProps) {
               </Select>
             </FormField>
             <FormField label="Total fee (₹)">
-              <Input type="number" min={0} value={f.feeTotal} onChange={set('feeTotal')} />
+              <Input type="number" min={0} step="0.01" inputMode="decimal" value={f.feeTotal} onChange={set('feeTotal')} />
             </FormField>
             <FormField label="Total lessons">
-              <Input type="number" min={0} value={f.sessionsTotal} onChange={set('sessionsTotal')} />
+              <Input type="number" min={0} step="1" value={f.sessionsTotal} onChange={set('sessionsTotal')} />
             </FormField>
             <FormField label="Status">
               <Select value={f.status} onChange={(e) => setF((x) => ({ ...x, status: e.target.value as StudentStatus }))}>

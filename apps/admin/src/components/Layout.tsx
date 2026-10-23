@@ -208,12 +208,13 @@ export function Layout() {
       return false;
     }
   });
-  const [mobileOpen, setMobileOpen] = useState(false);
   const { school, isOwner } = useSchool();
   const { isSuperAdmin } = useAuth();
   const location = useLocation();
-
-  useEffect(() => setMobileOpen(false), [location.pathname]);
+  // The drawer remembers the page it was opened on, so any navigation closes it without an effect.
+  const [drawerPath, setDrawerPath] = useState<string | null>(null);
+  const mobileOpen = drawerPath === location.pathname;
+  const setMobileOpen = (open: boolean) => setDrawerPath(open ? location.pathname : null);
 
   const toggle = () => {
     setCollapsed((c) => {

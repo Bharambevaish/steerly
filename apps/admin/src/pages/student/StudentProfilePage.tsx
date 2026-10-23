@@ -6,7 +6,7 @@ import { useLiveDoc } from '../../lib/hooks';
 import { useSchoolId } from '../../lib/school';
 import { formatINR, telLink, waLink } from '../../lib/format';
 import { Avatar, Badge, Button, EmptyState, FullPageSpinner, ProgressBar, Tabs } from '../../components/ui';
-import { STUDENT_STATUS_TONE } from '../StudentsPage';
+import { STUDENT_STATUS_TONE } from '../../lib/labels';
 import OverviewTab from './OverviewTab';
 
 const LessonsTab = lazy(() => import('./LessonsTab'));

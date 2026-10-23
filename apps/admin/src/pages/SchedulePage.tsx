@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { deleteDoc, doc, serverTimestamp, setDoc, Timestamp, updateDoc, where } from 'firebase/firestore';
 import clsx from 'clsx';
@@ -8,12 +8,14 @@ import { schoolCol, TIMEZONE, type Availability, type Booking, type Slot, type T
 import { db } from '../lib/firebase';
 import { call } from '../lib/callables';
 import { useLiveCollection, useLiveDoc } from '../lib/hooks';
-import { useSchool, useSchoolId } from '../lib/school';
+import { instructorLabel, useSchool, useSchoolId } from '../lib/school';
+import { useNow } from '../lib/useNow';
 import { addDaysYmd, fmt, fmtTime, istDate, todayYmd, weekStartYmd, ymdLabel } from '../lib/format';
 import { Button, Card, EmptyState, FormField, IconButton, Input, PageHeader, Select, Skeleton, Tabs } from '../components/ui';
 import { Modal } from '../components/Modal';
 import { useToast } from '../components/Toast';
-import { BOOKING_LABEL, BookingModal, BookSlotModal } from '../components/BookingDialogs';
+import { BookingModal, BookSlotModal } from '../components/BookingDialogs';
+import { BOOKING_LABEL } from '../lib/labels';
 
 const WEEKDAYS: { id: Weekday; label: string }[] = [
   { id: 'mon', label: 'Monday' },
@@ -31,19 +33,20 @@ const emptyWeek = (): Record<Weekday, TimeRange[]> => ({ mon: [], tue: [], wed: 
 
 function AvailabilityEditor({ instructorId }: { instructorId: string }) {
   const schoolId = useSchoolId();
-  const toast = useToast();
   const path = `${schoolCol(schoolId, 'availability')}/${instructorId}`;
   const { data, loading } = useLiveDoc<Availability & { id: string }>(path);
-  const vehicles = useLiveCollection<Vehicle>(schoolCol(schoolId, 'vehicles'));
-  const [weekly, setWeekly] = useState<Record<Weekday, TimeRange[]>>(emptyWeek);
-  const [vehicleId, setVehicleId] = useState('');
-  const [busy, setBusy] = useState(false);
+  if (loading) return <Skeleton className="h-96" />;
+  // The form owns its draft once loaded; saving doesn't reset it (parent keys this by instructor).
+  return <AvailabilityForm path={path} instructorId={instructorId} initial={data} />;
+}
 
-  useEffect(() => {
-    if (loading) return;
-    setWeekly({ ...emptyWeek(), ...(data?.weekly ?? {}) });
-    setVehicleId(data?.vehicleId ?? '');
-  }, [loading, data]);
+function AvailabilityForm({ path, instructorId, initial }: { path: string; instructorId: string; initial: Availability | null }) {
+  const schoolId = useSchoolId();
+  const toast = useToast();
+  const vehicles = useLiveCollection<Vehicle>(schoolCol(schoolId, 'vehicles'));
+  const [weekly, setWeekly] = useState<Record<Weekday, TimeRange[]>>(() => ({ ...emptyWeek(), ...(initial?.weekly ?? {}) }));
+  const [vehicleId, setVehicleId] = useState(initial?.vehicleId ?? '');
+  const [busy, setBusy] = useState(false);
 
   const update = (day: Weekday, i: number, patch: Partial<TimeRange>) =>
     setWeekly((w) => ({ ...w, [day]: w[day].map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
@@ -53,8 +56,10 @@ function AvailabilityEditor({ instructorId }: { instructorId: string }) {
 
   const save = async () => {
     for (const d of WEEKDAYS) {
-      for (const r of weekly[d.id]) {
+      const ranges = [...weekly[d.id]].sort((a, b) => a.start.localeCompare(b.start));
+      for (const [i, r] of ranges.entries()) {
         if (!r.start || !r.end || r.start >= r.end) return toast.error(`${d.label}: end time must be after start time.`);
+        if (i > 0 && r.start < ranges[i - 1]!.end) return toast.error(`${d.label}: time ranges overlap.`);
       }
     }
     setBusy(true);
@@ -69,8 +74,6 @@ function AvailabilityEditor({ instructorId }: { instructorId: string }) {
     }
   };
 
-  if (loading) return <Skeleton className="h-96" />;
-
   return (
     <Card className="p-4 sm:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -81,7 +84,7 @@ function AvailabilityEditor({ instructorId }: { instructorId: string }) {
         <FormField label="Default vehicle" className="sm:w-56">
           <Select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
             <option value="">None</option>
-            {vehicles.data.map((v) => (
+            {vehicles.data.filter((v) => v.active !== false || v.id === vehicleId).map((v) => (
               <option key={v.id} value={v.id}>
                 {v.regNumber} {v.model && `· ${v.model}`}
               </option>
@@ -96,7 +99,7 @@ function AvailabilityEditor({ instructorId }: { instructorId: string }) {
             <div className="flex flex-1 flex-wrap items-center gap-2">
               {weekly[d.id].length === 0 && <span className="pt-2 text-sm text-slate-600">Off</span>}
               {weekly[d.id].map((r, i) => (
-                <div key={i} className="flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-900 p-1">
+                <div key={i} className="flex max-w-full items-center gap-1 rounded-xl border border-slate-700 bg-slate-900 p-1">
                   <input type="time" value={r.start} step={900} onChange={(e) => update(d.id, i, { start: e.target.value })} className="rounded-lg bg-transparent px-1.5 py-1 text-sm text-white focus:outline-none" />
                   <span className="text-slate-500">–</span>
                   <input type="time" value={r.end} step={900} onChange={(e) => update(d.id, i, { end: e.target.value })} className="rounded-lg bg-transparent px-1.5 py-1 text-sm text-white focus:outline-none" />
@@ -186,7 +189,7 @@ function GenerateModal({ instructorId, instructorName, onClose }: { instructorId
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-300">
           <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} className="h-4 w-4 accent-[rgb(var(--brand))]" />
-          All instructors ({instructors.length}) instead of only {instructorName}
+          Everyone who gives lessons ({instructors.length}) instead of only {instructorName}
         </label>
       </form>
     </Modal>
@@ -199,6 +202,7 @@ function SlotModal({ slot, onClose, onBook }: { slot: Slot; onClose: () => void;
   const schoolId = useSchoolId();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const now = useNow();
   const ref = doc(db, schoolCol(schoolId, 'slots'), slot.id);
   const run = async (fn: () => Promise<unknown>, msg: string) => {
     setBusy(true);
@@ -211,7 +215,7 @@ function SlotModal({ slot, onClose, onBook }: { slot: Slot; onClose: () => void;
       setBusy(false);
     }
   };
-  const past = slot.start.toMillis() < Date.now();
+  const past = slot.start.toMillis() < now;
 
   return (
     <Modal open onClose={onClose} size="sm" title={`${fmt(slot.start, 'EEE d MMM')} · ${fmtTime(slot.start)}–${fmtTime(slot.end)}`} description={`${slot.instructorName} · ${slot.status === 'open' ? 'Open' : 'Blocked'}`}>
@@ -407,7 +411,7 @@ export default function SchedulePage() {
         <EmptyState
           icon={Users}
           title="Add an instructor first"
-          description="Invite instructors on the Team page, then set their weekly hours here."
+          description="Invite an instructor, or switch on “Also gives lessons” for yourself on the Team page. Then set weekly hours here."
           action={
             <Link to="/team">
               <Button>Go to Team</Button>
@@ -425,10 +429,10 @@ export default function SchedulePage() {
         subtitle="Instructor hours, bookable slots and lessons."
         actions={
           <>
-            <Select value={current!.uid} onChange={(e) => setInstructorId(e.target.value)} className="w-auto min-w-[180px]">
+            <Select value={current!.uid} onChange={(e) => setInstructorId(e.target.value)} aria-label="Instructor" className="w-full min-w-0 sm:w-auto sm:min-w-[180px]">
               {instructors.map((i) => (
                 <option key={i.uid} value={i.uid}>
-                  {i.name}
+                  {instructorLabel(i)}
                 </option>
               ))}
             </Select>

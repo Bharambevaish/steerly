@@ -39,8 +39,8 @@ export function timeAgo(ts: TsLike): string {
 
 // ---------- IST calendar-day helpers (dates as "YYYY-MM-DD" strings) ----------
 
-/** Today's date in IST as YYYY-MM-DD. */
-export const todayYmd = (): string => formatInTimeZone(new Date(), TIMEZONE, 'yyyy-MM-dd');
+/** Today's date in IST as YYYY-MM-DD (or the IST date of `at`, epoch ms). */
+export const todayYmd = (at: number = Date.now()): string => formatInTimeZone(at, TIMEZONE, 'yyyy-MM-dd');
 
 /** Add days to a YYYY-MM-DD string (calendar arithmetic, timezone-independent). */
 export const addDaysYmd = (ymd: string, n: number): string => format(addDays(parseISO(ymd), n), 'yyyy-MM-dd');
@@ -73,9 +73,9 @@ export function daysUntil(ts: TsLike): number | null {
   return Math.ceil((d.getTime() - Date.now()) / 86_400_000);
 }
 
-/** First moment of the current month in IST. */
-export function monthStart(): Date {
-  return istDate(`${formatInTimeZone(new Date(), TIMEZONE, 'yyyy-MM')}-01`);
+/** First moment of the IST month containing `at` (default now). */
+export function monthStart(at: number = Date.now()): Date {
+  return istDate(`${formatInTimeZone(at, TIMEZONE, 'yyyy-MM')}-01`);
 }
 
 // ---------- Contact links ----------

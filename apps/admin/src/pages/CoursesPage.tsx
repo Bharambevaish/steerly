@@ -86,7 +86,7 @@ function CourseModal({ course, nextOrder, onClose }: { course: Course | null; ne
           </Select>
         </FormField>
         <FormField label="Price (₹)">
-          <Input type="number" min={0} step="1" inputMode="decimal" value={f.price} onChange={set('price')} required placeholder="4500" />
+          <Input type="number" min={0} step="0.01" inputMode="decimal" value={f.price} onChange={set('price')} required placeholder="4500" />
         </FormField>
         <FormField label="Lessons">
           <Input type="number" min={1} value={f.sessions} onChange={set('sessions')} />

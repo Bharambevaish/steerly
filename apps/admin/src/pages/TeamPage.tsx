@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from 'react';
-import { deleteDoc, doc } from 'firebase/firestore';
-import { Mail, Phone, Send, UserPlus, Users, X } from 'lucide-react';
+import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { Crown, Mail, Phone, Send, UserPlus, Users, X } from 'lucide-react';
 import { phoneSchema, schoolCol, type Invite, type Member } from '@steerly/shared';
 import { db } from '../lib/firebase';
 import { call } from '../lib/callables';
 import { useLiveCollection } from '../lib/hooks';
-import { useSchool, useSchoolId } from '../lib/school';
+import { givesLessons, useSchool, useSchoolId } from '../lib/school';
 import { timeAgo } from '../lib/format';
 import { useAuth } from '../auth/AuthProvider';
 import { Avatar, Badge, Button, Card, FormField, Input, PageHeader, Select, Toggle, type Tone } from '../components/ui';
@@ -76,6 +76,43 @@ function InviteModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function OwnershipCard({ owners, youAreOwner }: { owners: Member[]; youAreOwner: boolean }) {
+  const soleOwner = youAreOwner && owners.length <= 1;
+  return (
+    <Card className="mt-6 p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300">
+          <Crown className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 space-y-2 text-sm text-slate-400">
+          <h3 className="text-sm font-bold text-white">Transferring ownership</h3>
+          <p>
+            A school always needs at least one active owner, and you can’t remove your own owner access. To hand the school over, or before deleting your own
+            account:
+          </p>
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>
+              Change another team member’s role to <span className="font-semibold text-slate-200">Owner</span> above.
+            </li>
+            <li>Ask them to sign in and change your role to Office staff or Instructor (or deactivate you).</li>
+            <li>You can then delete your account from the Steerly app (Profile → Delete account).</li>
+          </ol>
+          {youAreOwner && (
+            <p className={soleOwner ? 'font-semibold text-amber-300' : 'text-slate-500'}>
+              {soleOwner ? 'You’re the only owner right now, so your account can’t be deleted yet.' : `Owners: ${owners.map((o) => o.name).join(', ')}.`}
+            </p>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+interface RoleChange {
+  member: Member;
+  role: TeamRole;
+}
+
 export default function TeamPage() {
   const schoolId = useSchoolId();
   const { members, isOwner } = useSchool();
@@ -84,13 +121,44 @@ export default function TeamPage() {
   const invites = useLiveCollection<Invite & { id: string }>(schoolCol(schoolId, 'invites'));
   const [inviting, setInviting] = useState(false);
   const [cancelInvite, setCancelInvite] = useState<(Invite & { id: string }) | null>(null);
+  const [roleChange, setRoleChange] = useState<RoleChange | null>(null);
   const [busyUid, setBusyUid] = useState<string | null>(null);
 
-  const update = async (m: Member, patch: { role?: TeamRole; active?: boolean }) => {
+  const owners = members.filter((m) => m.role === 'owner' && m.active !== false);
+  const me = members.find((m) => m.uid === user?.uid);
+
+  /** Role/active go through updateMember (it also updates claims). Resolves false when it failed. */
+  const update = async (m: Member, patch: { role?: TeamRole; active?: boolean }): Promise<boolean> => {
     setBusyUid(m.uid);
     try {
       await call('updateMember', { schoolId, uid: m.uid, ...patch });
-      toast.success('Member updated.');
+      // An instructor moved to owner/staff keeps teaching, so their students and schedule stay valid.
+      if (patch.role && patch.role !== 'instructor' && m.role === 'instructor' && m.teaches !== true) {
+        await updateDoc(doc(db, schoolCol(schoolId, 'members'), m.uid), { teaches: true });
+      }
+      toast.success(patch.role === 'owner' ? `${m.name} is now an owner.` : 'Member updated.');
+      return true;
+    } catch (err) {
+      toast.error(err);
+      return false;
+    } finally {
+      setBusyUid(null);
+    }
+  };
+
+  const changeRole = (m: Member, role: TeamRole) => {
+    if (role === m.role) return;
+    // Granting or removing owner access is a big deal: confirm first.
+    if (role === 'owner' || m.role === 'owner') setRoleChange({ member: m, role });
+    else void update(m, { role });
+  };
+
+  /** "Gives lessons" is a plain member field owners may write directly (see firestore.rules). */
+  const setTeaches = async (m: Member, teaches: boolean) => {
+    setBusyUid(m.uid);
+    try {
+      await updateDoc(doc(db, schoolCol(schoolId, 'members'), m.uid), { teaches });
+      toast.success(teaches ? `${m.name} can now be assigned students and lessons.` : `${m.name} no longer shows up as an instructor.`);
     } catch (err) {
       toast.error(err);
     } finally {
@@ -113,11 +181,11 @@ export default function TeamPage() {
             <p className="flex items-center gap-1 truncate text-xs text-slate-500">
               {m.phone ? (
                 <>
-                  <Phone className="h-3 w-3" /> {m.phone}
+                  <Phone className="h-3 w-3 shrink-0" /> {m.phone}
                 </>
               ) : m.email ? (
                 <>
-                  <Mail className="h-3 w-3" /> {m.email}
+                  <Mail className="h-3 w-3 shrink-0" /> <span className="truncate">{m.email}</span>
                 </>
               ) : null}
             </p>
@@ -130,7 +198,13 @@ export default function TeamPage() {
       header: 'Role',
       cell: (m) =>
         isOwner && m.uid !== user?.uid ? (
-          <Select value={m.role} disabled={busyUid === m.uid} onChange={(e) => update(m, { role: e.target.value as TeamRole })} className="w-40 py-1.5 text-xs">
+          <Select
+            value={m.role}
+            disabled={busyUid === m.uid}
+            onChange={(e) => changeRole(m, e.target.value as TeamRole)}
+            aria-label={`Role for ${m.name}`}
+            className="w-full max-w-40 py-1.5 text-xs"
+          >
             {(Object.keys(ROLE_LABEL) as TeamRole[]).map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABEL[r]}
@@ -139,6 +213,18 @@ export default function TeamPage() {
           </Select>
         ) : (
           <Badge tone={ROLE_TONE[m.role]}>{ROLE_LABEL[m.role] ?? m.role}</Badge>
+        ),
+    },
+    {
+      key: 'teaches',
+      header: 'Gives lessons',
+      cell: (m) =>
+        m.role === 'instructor' ? (
+          <span className="text-xs text-slate-500">Always</span>
+        ) : isOwner ? (
+          <Toggle checked={givesLessons(m)} disabled={busyUid === m.uid || m.active === false} onChange={(v) => setTeaches(m, v)} label={givesLessons(m) ? 'Yes' : 'No'} />
+        ) : (
+          <span className="text-xs text-slate-400">{givesLessons(m) ? 'Yes' : 'No'}</span>
         ),
     },
     {
@@ -153,11 +239,19 @@ export default function TeamPage() {
     },
   ];
 
+  const rc = roleChange;
+  const otherOwners = owners.filter((o) => o.uid !== rc?.member.uid);
+  const roleMessage = !rc
+    ? ''
+    : rc.role === 'owner'
+      ? `${rc.member.name} will get full access: settings, billing, team and payments. Use this to add a co-owner, or to hand the school over before you leave.`
+      : `${rc.member.name} will lose owner access and become ${ROLE_LABEL[rc.role].toLowerCase()}.${otherOwners.length === 0 ? ' They are the only active owner, so this will be refused — make someone else an owner first.' : ''}`;
+
   return (
     <>
       <PageHeader
         title="Team"
-        subtitle={isOwner ? 'Owners, office staff and instructors.' : 'Only the owner can invite or change team members.'}
+        subtitle={isOwner ? 'Owners, office staff and instructors. Switch on “Gives lessons” for owners or staff who also teach.' : 'Only an owner can invite or change team members.'}
         actions={
           isOwner && (
             <Button icon={UserPlus} onClick={() => setInviting(true)}>
@@ -177,7 +271,7 @@ export default function TeamPage() {
                 <Avatar name={i.name} className="h-8 w-8 text-xs" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-white">{i.name}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="truncate text-xs text-slate-500">
                     {i.phone} · {ROLE_LABEL[i.role]} · invited {timeAgo(i.createdAt)}
                   </p>
                 </div>
@@ -192,7 +286,22 @@ export default function TeamPage() {
         </Card>
       )}
 
+      {isOwner && <OwnershipCard owners={owners} youAreOwner={me?.role === 'owner'} />}
+
       {inviting && <InviteModal onClose={() => setInviting(false)} />}
+      <ConfirmDialog
+        open={!!rc}
+        onClose={() => setRoleChange(null)}
+        danger={rc?.member.role === 'owner'}
+        title={rc?.role === 'owner' ? `Make ${rc.member.name} an owner?` : `Remove ${rc?.member.name ?? ''}’s owner access?`}
+        message={roleMessage}
+        confirmLabel={rc?.role === 'owner' ? 'Make owner' : 'Change role'}
+        onConfirm={async () => {
+          if (!rc) return;
+          // update() shows the error toast; throwing keeps the dialog open.
+          if (!(await update(rc.member, { role: rc.role }))) throw new Error('updateMember failed');
+        }}
+      />
       <ConfirmDialog
         open={!!cancelInvite}
         onClose={() => setCancelInvite(null)}

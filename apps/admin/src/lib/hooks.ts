@@ -21,13 +21,17 @@ export interface LiveResult<T> {
 /**
  * Live (onSnapshot) query. `path` null = disabled. `key` must change whenever `constraints` change
  * (constraints are rebuilt every render, so they're read from a ref).
+ *
+ * State is tagged with the subscription it belongs to, so a new path/key reads as "loading" during
+ * render instead of resetting state synchronously inside the effect.
  */
 export function useLiveCollection<T extends { id: string }>(
   path: string | null,
   constraints: QueryConstraint[] = [],
   key = '',
 ): LiveResult<T> {
-  const [state, setState] = useState<LiveResult<T>>({ data: [], loading: !!path, error: null });
+  const sub = path ? `${path}|${key}` : null;
+  const [state, setState] = useState<LiveResult<T> & { sub: string | null }>({ sub: null, data: [], loading: false, error: null });
   const constraintsRef = useRef(constraints);
   // Keep the latest constraints for the subscription effect below (runs first in the same commit).
   useEffect(() => {
@@ -35,29 +39,31 @@ export function useLiveCollection<T extends { id: string }>(
   });
 
   useEffect(() => {
-    if (!path) {
-      setState({ data: [], loading: false, error: null });
-      return;
-    }
-    setState((s) => ({ ...s, loading: true, error: null }));
+    if (!path || !sub) return;
     const q = query(collection(db, path), ...constraintsRef.current);
     return onSnapshot(
       q,
       (snap) =>
         setState({
+          sub,
           data: snap.docs.map((d) => ({ ...(d.data() as DocumentData), id: d.id }) as T),
           loading: false,
           error: null,
         }),
       (error) => {
         console.error(`Live query ${path} failed`, error);
-        setState({ data: [], loading: false, error });
+        setState({ sub, data: [], loading: false, error });
       },
     );
-  }, [path, key]);
+  }, [path, sub]);
 
+  if (!sub) return EMPTY_LIVE as LiveResult<T>;
+  if (state.sub !== sub) return LOADING_LIVE as LiveResult<T>;
   return state;
 }
+
+const EMPTY_LIVE: LiveResult<never> = { data: [], loading: false, error: null };
+const LOADING_LIVE: LiveResult<never> = { data: [], loading: true, error: null };
 
 export interface LiveDocResult<T> {
   data: T | null;
@@ -66,18 +72,18 @@ export interface LiveDocResult<T> {
   error: Error | null;
 }
 
+const EMPTY_DOC: LiveDocResult<never> = { data: null, loading: false, exists: false, error: null };
+const LOADING_DOC: LiveDocResult<never> = { data: null, loading: true, exists: false, error: null };
+
 export function useLiveDoc<T extends { id: string }>(path: string | null): LiveDocResult<T> {
-  const [state, setState] = useState<LiveDocResult<T>>({ data: null, loading: !!path, exists: false, error: null });
+  const [state, setState] = useState<LiveDocResult<T> & { path: string | null }>({ path: null, ...EMPTY_DOC });
   useEffect(() => {
-    if (!path) {
-      setState({ data: null, loading: false, exists: false, error: null });
-      return;
-    }
-    setState((s) => ({ ...s, loading: true }));
+    if (!path) return;
     return onSnapshot(
       doc(db, path),
       (snap) =>
         setState({
+          path,
           data: snap.exists() ? ({ ...(snap.data() as DocumentData), id: snap.id } as T) : null,
           exists: snap.exists(),
           loading: false,
@@ -85,10 +91,12 @@ export function useLiveDoc<T extends { id: string }>(path: string | null): LiveD
         }),
       (error) => {
         console.error(`Live doc ${path} failed`, error);
-        setState({ data: null, exists: false, loading: false, error });
+        setState({ path, data: null, exists: false, loading: false, error });
       },
     );
   }, [path]);
+  if (!path) return EMPTY_DOC as LiveDocResult<T>;
+  if (state.path !== path) return LOADING_DOC as LiveDocResult<T>;
   return state;
 }
 

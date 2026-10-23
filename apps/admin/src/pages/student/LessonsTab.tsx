@@ -4,6 +4,7 @@ import { CalendarPlus } from 'lucide-react';
 import { schoolCol, type Booking } from '@steerly/shared';
 import { useLiveCollection } from '../../lib/hooks';
 import { useSchoolId } from '../../lib/school';
+import { useNow } from '../../lib/useNow';
 import { BookingList, BookingModal, BookSlotModal } from '../../components/BookingDialogs';
 import { Button, Card } from '../../components/ui';
 import type { StudentTabProps } from './StudentProfilePage';
@@ -14,7 +15,7 @@ export default function LessonsTab({ student }: StudentTabProps) {
   const [open, setOpen] = useState<Booking | null>(null);
   const [booking, setBooking] = useState(false);
 
-  const now = Date.now();
+  const now = useNow();
   const upcoming = data.filter((b) => b.status === 'booked' && b.end.toMillis() >= now).sort((a, b) => a.start.toMillis() - b.start.toMillis());
   const past = data.filter((b) => !upcoming.includes(b)).sort((a, b) => b.start.toMillis() - a.start.toMillis());
   const live = open ? (data.find((b) => b.id === open.id) ?? open) : null;

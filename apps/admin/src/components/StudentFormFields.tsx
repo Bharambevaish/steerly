@@ -1,29 +1,14 @@
-import { useEffect } from 'react';
 import type { Course } from '@steerly/shared';
-import { useSchool } from '../lib/school';
-import { formatINR, toPaise } from '../lib/format';
+import { instructorLabel, useSchool } from '../lib/school';
+import { formatINR } from '../lib/format';
+import type { EnrolValues } from '../lib/enrol';
 import { FormField, Input, Select } from './ui';
-
-export interface EnrolValues {
-  courseId: string;
-  instructorId: string;
-  branchId: string;
-  /** Rupees as typed; empty = course price. */
-  fee: string;
-}
-
-export const emptyEnrol: EnrolValues = { courseId: '', instructorId: '', branchId: '', fee: '' };
 
 /** Course / instructor / branch / fee override fields shared by "Add student" and "Convert lead". */
 export function EnrolFields({ value, onChange }: { value: EnrolValues; onChange: (v: EnrolValues) => void }) {
   const { courses, instructors, branches } = useSchool();
   const active = courses.filter((c) => c.active !== false);
   const course: Course | undefined = courses.find((c) => c.id === value.courseId);
-
-  useEffect(() => {
-    if (!value.courseId && active[0]) onChange({ ...value, courseId: active[0].id });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active.length]);
 
   const set = (k: keyof EnrolValues) => (e: { target: { value: string } }) => onChange({ ...value, [k]: e.target.value });
 
@@ -39,12 +24,12 @@ export function EnrolFields({ value, onChange }: { value: EnrolValues; onChange:
           ))}
         </Select>
       </FormField>
-      <FormField label="Instructor">
+      <FormField label="Instructor" hint={instructors.length === 0 ? 'Nobody gives lessons yet — invite an instructor or switch on “Also gives lessons” on the Team page.' : undefined}>
         <Select value={value.instructorId} onChange={set('instructorId')}>
           <option value="">Assign later</option>
           {instructors.map((m) => (
             <option key={m.uid} value={m.uid}>
-              {m.name}
+              {instructorLabel(m)}
             </option>
           ))}
         </Select>
@@ -60,17 +45,8 @@ export function EnrolFields({ value, onChange }: { value: EnrolValues; onChange:
         </Select>
       </FormField>
       <FormField label="Fee (₹)" className="sm:col-span-2" hint={course ? `Leave empty to use the course price (${formatINR(course.price)}). Lower it for a discount.` : undefined}>
-        <Input type="number" min={0} step="1" inputMode="decimal" placeholder={course ? String(course.price / 100) : '0'} value={value.fee} onChange={set('fee')} />
+        <Input type="number" min={0} step="0.01" inputMode="decimal" placeholder={course ? String(course.price / 100) : '0'} value={value.fee} onChange={set('fee')} />
       </FormField>
     </div>
   );
-}
-
-export function enrolPayload(v: EnrolValues) {
-  return {
-    courseId: v.courseId,
-    instructorId: v.instructorId || null,
-    branchId: v.branchId || null,
-    ...(v.fee.trim() !== '' ? { feeTotal: toPaise(Number(v.fee)) } : {}),
-  };
 }

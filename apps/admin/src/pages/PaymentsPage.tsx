@@ -9,7 +9,8 @@ import { addDaysYmd, downloadCsv, fmt, fmtDateTime, formatINR, istDate, PAYMENT_
 import { Button, Input, PageHeader, SearchInput, Select } from '../components/ui';
 import { DataTable, type Column } from '../components/DataTable';
 import { StatCard } from '../components/StatCard';
-import { PAYMENT_STATUS_LABEL, PaymentStatusBadge, ReceiptButton } from '../components/PaymentBits';
+import { PaymentStatusBadge, ReceiptButton } from '../components/PaymentBits';
+import { PAYMENT_STATUS_LABEL } from '../lib/labels';
 
 const when = (p: Payment) => (p.paidAt ?? p.createdAt)?.toMillis?.() ?? 0;
 

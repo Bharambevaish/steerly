@@ -5,22 +5,23 @@ import { GraduationCap, Plus } from 'lucide-react';
 import { phoneSchema, schoolCol, skillProgress, type Student, type StudentStatus } from '@steerly/shared';
 import { call } from '../lib/callables';
 import { useLiveCollection } from '../lib/hooks';
-import { useSchool, useSchoolId } from '../lib/school';
+import { instructorLabel, useSchool, useSchoolId } from '../lib/school';
 import { formatINR, downloadCsv, fmt, TEST_STATUS_LABELS } from '../lib/format';
-import { Avatar, Badge, Button, FormField, Input, PageHeader, ProgressBar, SearchInput, Select, type Tone } from '../components/ui';
+import { Avatar, Badge, Button, FormField, Input, PageHeader, ProgressBar, SearchInput, Select } from '../components/ui';
 import { DataTable, type Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
 import { useToast } from '../components/Toast';
-import { EnrolFields, emptyEnrol, enrolPayload, type EnrolValues } from '../components/StudentFormFields';
-
-export const STUDENT_STATUS_TONE: Record<StudentStatus, Tone> = { active: 'emerald', completed: 'blue', dropped: 'slate' };
+import { EnrolFields } from '../components/StudentFormFields';
+import { enrolPayload, initialEnrol, type EnrolValues } from '../lib/enrol';
+import { STUDENT_STATUS_TONE } from '../lib/labels';
 
 function AddStudentModal({ onClose }: { onClose: () => void }) {
   const schoolId = useSchoolId();
   const toast = useToast();
   const navigate = useNavigate();
+  const { courses } = useSchool();
   const [f, setF] = useState({ name: '', phone: '', email: '' });
-  const [enrol, setEnrol] = useState<EnrolValues>(emptyEnrol);
+  const [enrol, setEnrol] = useState<EnrolValues>(() => initialEnrol(courses));
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: FormEvent) => {
@@ -185,7 +186,7 @@ export default function StudentsPage() {
           <option value="none">Unassigned</option>
           {instructors.map((m) => (
             <option key={m.uid} value={m.uid}>
-              {m.name}
+              {instructorLabel(m)}
             </option>
           ))}
         </Select>

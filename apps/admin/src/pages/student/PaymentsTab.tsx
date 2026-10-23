@@ -58,7 +58,7 @@ function RecordModal({ studentId, due, onClose }: { studentId: string; due: numb
     >
       <form id="record-form" onSubmit={submit} className="space-y-4">
         <FormField label="Amount (₹)">
-          <Input autoFocus type="number" min={1} step="1" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          <Input autoFocus type="number" min={1} step="0.01" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required />
         </FormField>
         <FormField label="Method">
           <Select value={method} onChange={(e) => setMethod(e.target.value as Method)}>
@@ -105,7 +105,7 @@ function LinkModal({ studentId, studentName, phone, due, onClose }: { studentId:
       {!url ? (
         <form onSubmit={create} className="space-y-4">
           <FormField label="Amount (₹)">
-            <Input autoFocus type="number" min={1} step="1" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+            <Input autoFocus type="number" min={1} step="0.01" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required />
           </FormField>
           <Button type="submit" className="w-full" loading={busy} icon={Link2}>
             Create link

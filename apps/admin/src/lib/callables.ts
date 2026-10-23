@@ -12,6 +12,7 @@ import {
   type CreateSchoolInput,
   type CreateSchoolOutput,
   type CreateStudentInput,
+  type DeleteMyAccountInput,
   type DashboardStats,
   type GenerateSlotsInput,
   type GenerateSlotsOutput,
@@ -53,6 +54,7 @@ interface Callables {
   getDashboardStats: [GetDashboardStatsInput, DashboardStats];
   startSubscription: [StartSubscriptionInput, StartSubscriptionOutput];
   setSchoolStatus: [SetSchoolStatusInput, OkOutput];
+  deleteMyAccount: [DeleteMyAccountInput, OkOutput];
 }
 
 export type CallableName = keyof Callables & keyof typeof FN;

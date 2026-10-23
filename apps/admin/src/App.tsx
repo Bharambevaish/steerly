@@ -3,7 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './auth/AuthProvider';
 import { RequireAuth, RequireSchool, RequireSuperAdmin } from './auth/guards';
-import { SchoolProvider } from './lib/school';
+import { SchoolProvider } from './lib/SchoolProvider';
 import { ToastProvider } from './components/Toast';
 import { Layout } from './components/Layout';
 import { FullPageSpinner } from './components/ui';

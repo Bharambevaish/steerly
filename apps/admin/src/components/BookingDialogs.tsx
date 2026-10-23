@@ -15,14 +15,13 @@ import {
 } from '@steerly/shared';
 import { call } from '../lib/callables';
 import { useLiveCollection, useLiveDoc } from '../lib/hooks';
-import { useSchool, useSchoolId } from '../lib/school';
+import { instructorLabel, useSchool, useSchoolId } from '../lib/school';
 import { addDaysYmd, fmt, fmtTime, istDate, telLink, todayYmd } from '../lib/format';
-import { Avatar, Badge, Button, EmptyState, FormField, Input, Select, Skeleton, Textarea, type Tone } from './ui';
+import { BOOKING_LABEL, BOOKING_TONE } from '../lib/labels';
+import { useNow } from '../lib/useNow';
+import { Avatar, Badge, Button, EmptyState, FormField, Input, Select, Skeleton, Textarea } from './ui';
 import { Modal } from './Modal';
 import { useToast } from './Toast';
-
-export const BOOKING_TONE: Record<Booking['status'], Tone> = { booked: 'blue', completed: 'emerald', cancelled: 'slate', no_show: 'red' };
-export const BOOKING_LABEL: Record<Booking['status'], string> = { booked: 'Booked', completed: 'Completed', cancelled: 'Cancelled', no_show: 'No-show' };
 
 /** Searchable list of active students. */
 export function StudentPicker({ value, onChange }: { value: string | null; onChange: (s: Student) => void }) {
@@ -79,8 +78,12 @@ export function BookSlotModal({ slot, student, onClose }: { slot?: Slot; student
   const schoolId = useSchoolId();
   const { instructors } = useSchool();
   const toast = useToast();
+  const now = useNow();
   const [picked, setPicked] = useState<Student | null>(student ?? null);
-  const [instructorId, setInstructorId] = useState(student?.instructorId ?? instructors[0]?.uid ?? '');
+  const [chosenInstructor, setInstructorId] = useState<string | null>(null);
+  // Default to the student's own instructor while they still teach, else the first one who does.
+  const instructorId =
+    chosenInstructor ?? (instructors.some((m) => m.uid === student?.instructorId) ? student!.instructorId! : (instructors[0]?.uid ?? ''));
   const [day, setDay] = useState(todayYmd());
   const [slotId, setSlotId] = useState<string | null>(slot?.id ?? null);
   const [busy, setBusy] = useState(false);
@@ -89,7 +92,7 @@ export function BookSlotModal({ slot, student, onClose }: { slot?: Slot; student
   const to = Timestamp.fromDate(istDate(addDaysYmd(day, 1)));
   const slots = useLiveCollection<Slot>(slot ? null : schoolCol(schoolId, 'slots'), [where('start', '>=', from), where('start', '<', to)], day);
   const open = slots.data
-    .filter((s) => s.status === 'open' && s.instructorId === instructorId && s.start.toMillis() > Date.now())
+    .filter((s) => s.status === 'open' && s.instructorId === instructorId && s.start.toMillis() > now)
     .sort((a, b) => a.start.toMillis() - b.start.toMillis());
 
   const book = async () => {
@@ -132,7 +135,7 @@ export function BookSlotModal({ slot, student, onClose }: { slot?: Slot; student
                 {instructors.length === 0 && <option value="">No instructors</option>}
                 {instructors.map((m) => (
                   <option key={m.uid} value={m.uid}>
-                    {m.name}
+                    {instructorLabel(m)}
                   </option>
                 ))}
               </Select>
@@ -171,6 +174,7 @@ export function BookSlotModal({ slot, student, onClose }: { slot?: Slot; student
 export function BookingModal({ booking, onClose }: { booking: Booking; onClose: () => void }) {
   const schoolId = useSchoolId();
   const toast = useToast();
+  const now = useNow();
   const student = useLiveDoc<Student>(`${schoolCol(schoolId, 'students')}/${booking.studentId}`);
   const [mode, setMode] = useState<'view' | 'cancel' | 'complete'>('view');
   const [reason, setReason] = useState('');
@@ -298,7 +302,7 @@ export function BookingModal({ booking, onClose }: { booking: Booking; onClose: 
               {booking.feedback && <span className="text-slate-400"> — “{booking.feedback}”</span>}
             </p>
           )}
-          {isBooked && booking.start.toMillis() > Date.now() && <p className="text-xs text-slate-500">Upcoming lesson. You can cancel it or mark it complete after it happens.</p>}
+          {isBooked && booking.start.toMillis() > now && <p className="text-xs text-slate-500">Upcoming lesson. You can cancel it or mark it complete after it happens.</p>}
         </div>
       )}
 

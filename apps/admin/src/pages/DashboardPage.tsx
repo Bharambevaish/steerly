@@ -5,8 +5,10 @@ import { CalendarClock, CalendarDays, GraduationCap, IndianRupee, Percent, Spark
 import { schoolCol, type Booking } from '@steerly/shared';
 import { useLiveCollection, useDashboardStats } from '../lib/hooks';
 import { useSchool, useSchoolId } from '../lib/school';
-import { addDaysYmd, daysUntil, fmt, fmtTime, formatINR, istDate, monthStart, todayYmd } from '../lib/format';
+import { addDaysYmd, daysUntil, fmt, fmtTime, formatINR, istDate, monthStart, todayYmd, ymdLabel } from '../lib/format';
+import { BOOKING_LABEL, BOOKING_TONE } from '../lib/labels';
 import { useAuth } from '../auth/AuthProvider';
+import { useNow } from '../lib/useNow';
 import { StatCard } from '../components/StatCard';
 import { ChartCard, InstructorChart, RevenueChart, SourceChart } from '../components/Charts';
 import { Badge, Button, EmptyState, PageHeader, Skeleton } from '../components/ui';
@@ -36,11 +38,10 @@ function SubscriptionBanner() {
   );
 }
 
-const STATUS_TONE = { booked: 'blue', completed: 'emerald', cancelled: 'slate', no_show: 'red' } as const;
-
 function TodayLessons() {
   const schoolId = useSchoolId();
-  const today = todayYmd();
+  // Re-evaluated every minute so the list rolls over at IST midnight without a reload.
+  const today = todayYmd(useNow());
   const from = Timestamp.fromDate(istDate(today));
   const to = Timestamp.fromDate(istDate(addDaysYmd(today, 1)));
   const { data, loading } = useLiveCollection<Booking>(schoolCol(schoolId, 'bookings'), [where('start', '>=', from), where('start', '<', to)], today);
@@ -51,7 +52,7 @@ function TodayLessons() {
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-white">Today's lessons</h3>
-          <p className="text-xs text-slate-500">{fmt(new Date(), 'EEEE, d MMMM')} · live</p>
+          <p className="text-xs text-slate-500">{ymdLabel(today, 'EEEE, d MMMM')} · live</p>
         </div>
         <Link to="/schedule" className="text-xs font-semibold text-brand hover:underline">
           Open schedule
@@ -79,7 +80,7 @@ function TodayLessons() {
                 </Link>
                 <p className="truncate text-xs text-slate-500">with {b.instructorName}</p>
               </div>
-              <Badge tone={STATUS_TONE[b.status]}>{b.status.replace('_', ' ')}</Badge>
+              <Badge tone={BOOKING_TONE[b.status]}>{BOOKING_LABEL[b.status]}</Badge>
             </li>
           ))}
         </ul>
@@ -91,8 +92,9 @@ function TodayLessons() {
 export default function DashboardPage() {
   const { schoolId, school } = useSchool();
   const { user } = useAuth();
-  const from = useMemo(() => monthStart(), []);
-  const to = useMemo(() => new Date(), []);
+  // This month up to the end of today (IST). Only changes when the IST date does, so the query key is stable.
+  const today = todayYmd(useNow());
+  const { from, to } = useMemo(() => ({ from: monthStart(istDate(today).getTime()), to: istDate(addDaysYmd(today, 1)) }), [today]);
   const { stats, loading, failed } = useDashboardStats(schoolId, from, to);
 
   const cards: { label: string; value: string; icon: LucideIcon; hint?: string; accent?: boolean }[] = [

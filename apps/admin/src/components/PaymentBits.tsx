@@ -3,11 +3,9 @@ import { FileDown, Loader2 } from 'lucide-react';
 import type { Payment, PaymentStatus } from '@steerly/shared';
 import { call } from '../lib/callables';
 import { useSchoolId } from '../lib/school';
-import { Badge, type Tone } from './ui';
+import { PAYMENT_STATUS_LABEL, PAYMENT_STATUS_TONE } from '../lib/labels';
+import { Badge } from './ui';
 import { useToast } from './Toast';
-
-export const PAYMENT_STATUS_TONE: Record<PaymentStatus, Tone> = { created: 'amber', paid: 'emerald', failed: 'red', cancelled: 'slate' };
-export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = { created: 'Awaiting payment', paid: 'Paid', failed: 'Failed', cancelled: 'Cancelled' };
 
 export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   return <Badge tone={PAYMENT_STATUS_TONE[status] ?? 'slate'}>{PAYMENT_STATUS_LABEL[status] ?? status}</Badge>;

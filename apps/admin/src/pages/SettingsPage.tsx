@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { doc, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import clsx from 'clsx';
-import { Check, Copy, CreditCard, ExternalLink, ImageUp, MessageCircle, Save, Share2 } from 'lucide-react';
+import { Check, Copy, CreditCard, ExternalLink, ImageUp, MessageCircle, Save, Share2, Trash2 } from 'lucide-react';
 import { COLLECTIONS, DEFAULT_SCHOOL_SETTINGS, PLANS, phoneSchema, schoolLogoPath, type PlanId, type School, type SchoolSettings } from '@steerly/shared';
 import { db, storage } from '../lib/firebase';
 import { call } from '../lib/callables';
@@ -12,6 +12,7 @@ import { copyText, daysUntil, fmt, formatINR, PUBLIC_SITE_URL, waShareLink } fro
 import { Badge, Button, Card, FormField, Input, PageHeader, Select, Textarea, type Tone } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { Logo } from '../components/Logo';
+import { useAuth } from '../auth/AuthProvider';
 
 const SWATCHES = ['#F59E0B', '#F97316', '#EF4444', '#EC4899', '#8B5CF6', '#3B82F6', '#06B6D4', '#10B981', '#84CC16'];
 const STATUS_TONE: Record<string, Tone> = { trial: 'brand', active: 'emerald', past_due: 'amber', suspended: 'red' };
@@ -359,6 +360,80 @@ function BillingSection({ school, readOnly }: { school: School; readOnly: boolea
   );
 }
 
+function DeleteAccountSection({ schoolName }: { schoolName: string }) {
+  const { role, signOut } = useAuth();
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const isOwnerRole = role === 'owner';
+  const blocked = isOwnerRole || role === 'superAdmin';
+
+  const run = async (e: FormEvent) => {
+    e.preventDefault();
+    if (blocked || confirm.trim() !== 'DELETE') return;
+    setBusy(true);
+    try {
+      await call('deleteMyAccount', { confirm: 'DELETE' });
+    } catch (err) {
+      // Server messages (e.g. "Transfer ownership first…") are shown as-is.
+      toast.error(err, 'Couldn’t delete your account. Please try again.');
+      setBusy(false);
+      return;
+    }
+    // The Auth user is gone; signing out just clears local state.
+    await signOut().catch(() => {});
+    toast.success('Your account has been deleted.');
+    navigate('/login', { replace: true });
+  };
+
+  return (
+    <Section id="delete-account" title="Delete my account" description="Removes your Steerly login. This can’t be undone.">
+      <div className="grid gap-4 text-sm sm:grid-cols-2">
+        <div>
+          <p className="mb-1.5 font-semibold text-white">What we delete</p>
+          <ul className="list-disc space-y-1 pl-5 text-slate-400">
+            <li>Your login (phone number / email) and profile</li>
+            <li>Your notifications inbox</li>
+            <li>Your access to {schoolName}</li>
+          </ul>
+        </div>
+        <div>
+          <p className="mb-1.5 font-semibold text-white">What {schoolName} keeps</p>
+          <ul className="list-disc space-y-1 pl-5 text-slate-400">
+            <li>Students, payments and receipts (required by tax law)</li>
+            <li>Lesson history you recorded or taught</li>
+            <li>Your name on past records</li>
+          </ul>
+        </div>
+      </div>
+      {blocked ? (
+        <p className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          {isOwnerRole ? (
+            <>
+              You’re an owner. Transfer ownership first: make another member an owner on the{' '}
+              <Link to="/team" className="font-semibold underline">
+                Team page
+              </Link>
+              , then ask them to change your role.
+            </>
+          ) : (
+            'Super-admin accounts can’t be deleted here. Remove the administrator role first.'
+          )}
+        </p>
+      ) : null}
+      <form onSubmit={run} className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <FormField label="Type DELETE to confirm" className="sm:w-64">
+          <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="DELETE" autoComplete="off" disabled={blocked || busy} />
+        </FormField>
+        <Button type="submit" variant="danger" icon={Trash2} loading={busy} disabled={blocked || confirm.trim() !== 'DELETE'}>
+          Permanently delete my account
+        </Button>
+      </form>
+    </Section>
+  );
+}
+
 export default function SettingsPage() {
   const { school, isOwner } = useSchool();
   const location = useLocation();
@@ -376,6 +451,7 @@ export default function SettingsPage() {
         <ShareSection school={school} />
         <SettingsSection key={`s-${school.id}`} school={school} readOnly={!isOwner} />
         <BillingSection school={school} readOnly={!isOwner} />
+        <DeleteAccountSection schoolName={school.name} />
       </div>
     </>
   );

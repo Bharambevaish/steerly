@@ -8,25 +8,27 @@ import { db } from '../lib/firebase';
 import { call } from '../lib/callables';
 import { useLiveCollection } from '../lib/hooks';
 import { useSchool, useSchoolId } from '../lib/school';
-import { fmt, SOURCE_LABELS, telLink, timeAgo, tsToYmd, waLink, ymdToTs, daysUntil } from '../lib/format';
+import { fmt, SOURCE_LABELS, telLink, timeAgo, todayYmd, tsToYmd, waLink, ymdToTs } from '../lib/format';
+import { useNow } from '../lib/useNow';
 import { Badge, Button, EmptyState, FormField, Input, PageHeader, SearchInput, Select, Skeleton, Tabs, Textarea, type Tone } from '../components/ui';
 import { Drawer, Modal } from '../components/Modal';
 import { useToast } from '../components/Toast';
-import { EnrolFields, emptyEnrol, enrolPayload, type EnrolValues } from '../components/StudentFormFields';
+import { EnrolFields } from '../components/StudentFormFields';
+import { enrolPayload, initialEnrol, type EnrolValues } from '../lib/enrol';
 
 const STATUSES: EnquiryStatusV2[] = ['New', 'Contacted', 'Enrolled', 'Lost'];
 const STATUS_TONE: Record<EnquiryStatusV2, Tone> = { New: 'brand', Contacted: 'blue', Enrolled: 'emerald', Lost: 'slate' };
 const MANUAL_SOURCES: EnquirySource[] = ['walk_in', 'phone', 'referral', 'web', 'app'];
+
+/** Open lead whose follow-up date (IST calendar day) is today or earlier. */
+const followUpDue = (e: EnquiryDoc, today: string) => !!e.followUpAt && e.status !== 'Enrolled' && e.status !== 'Lost' && tsToYmd(e.followUpAt) <= today;
 
 function ConvertModal({ lead, onClose }: { lead: EnquiryDoc; onClose: () => void }) {
   const schoolId = useSchoolId();
   const { courses } = useSchool();
   const toast = useToast();
   const navigate = useNavigate();
-  const [enrol, setEnrol] = useState<EnrolValues>(() => ({
-    ...emptyEnrol,
-    courseId: lead.courseId && courses.some((c) => c.id === lead.courseId) ? lead.courseId : '',
-  }));
+  const [enrol, setEnrol] = useState<EnrolValues>(() => initialEnrol(courses, lead.courseId));
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: FormEvent) => {
@@ -283,29 +285,28 @@ export default function LeadsPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [convertId, setConvertId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const today = todayYmd(useNow());
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { All: data.length, FollowUp: 0 };
     STATUSES.forEach((s) => (c[s] = 0));
     data.forEach((e) => {
       c[e.status] = (c[e.status] ?? 0) + 1;
-      const d = daysUntil(e.followUpAt);
-      if (d != null && d <= 0 && e.status !== 'Enrolled' && e.status !== 'Lost') c.FollowUp!++;
+      if (followUpDue(e, today)) c.FollowUp!++;
     });
     return c;
-  }, [data]);
+  }, [data, today]);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return data.filter((e) => {
       if (tab === 'FollowUp') {
-        const d = daysUntil(e.followUpAt);
-        if (d == null || d > 0 || e.status === 'Enrolled' || e.status === 'Lost') return false;
+        if (!followUpDue(e, today)) return false;
       } else if (tab !== 'All' && e.status !== tab) return false;
       if (!q) return true;
       return e.name.toLowerCase().includes(q) || e.phone.includes(q) || (e.courseName ?? '').toLowerCase().includes(q) || (e.notes ?? '').toLowerCase().includes(q);
     });
-  }, [data, tab, search]);
+  }, [data, tab, search, today]);
 
   const openLead = data.find((e) => e.id === openId) ?? null;
   const convertLead = data.find((e) => e.id === convertId) ?? null;
@@ -351,7 +352,7 @@ export default function LeadsPage() {
       ) : (
         <div className="grid gap-3">
           {rows.map((e) => {
-            const due = daysUntil(e.followUpAt);
+            const due = followUpDue(e, today);
             return (
               <div
                 key={e.id}
@@ -372,7 +373,7 @@ export default function LeadsPage() {
                     {e.courseName && <span>{e.courseName}</span>}
                     <span>{e.preferredTime}</span>
                     {e.followUpAt && e.status !== 'Enrolled' && (
-                      <span className={clsx('inline-flex items-center gap-1', due != null && due <= 0 ? 'font-semibold text-amber-300' : '')}>
+                      <span className={clsx('inline-flex items-center gap-1', due ? 'font-semibold text-amber-300' : '')}>
                         <CalendarClock className="h-3.5 w-3.5" /> Follow up {fmt(e.followUpAt, 'd MMM')}
                       </span>
                     )}
