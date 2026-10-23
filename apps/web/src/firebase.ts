@@ -1,6 +1,6 @@
 // Only imported by the lazily-loaded public school page, so the marketing pages never ship Firebase.
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore/lite';
+import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore/lite';
 
 const env = import.meta.env;
 
@@ -32,4 +32,10 @@ if (firebaseConfigured && siteKey) {
 }
 
 export const db = getFirestore(app);
+
+// Local development against `npm run emulators` (see .env.emulator / `npm run dev:emulator`).
+if (env.VITE_USE_EMULATORS === 'true') {
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+}
+
 export default app;

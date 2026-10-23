@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID: string;
   readonly VITE_APPCHECK_RECAPTCHA_SITE_KEY?: string;
   readonly VITE_ADMIN_URL?: string;
+  readonly VITE_USE_EMULATORS?: string;
   readonly VITE_PLAY_STORE_URL?: string;
 }
 
