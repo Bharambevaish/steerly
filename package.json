@@ -19,7 +19,8 @@
     "emulators": "npm run build:functions && firebase emulators:start --project demo-steerly --only auth,functions,firestore,storage",
     "e2e": "node scripts/e2e.mjs",
     "admin:emulator": "npm run dev:emulator -w steerly-admin",
-    "brand": "node scripts/brand/generate.mjs"
+    "brand": "node scripts/brand/generate.mjs",
+    "seed": "node scripts/seed.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

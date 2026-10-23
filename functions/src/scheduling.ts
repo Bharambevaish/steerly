@@ -19,6 +19,7 @@ import { as, assertSchoolUsable, getBooking, getMember, getSchool, getStudent, s
 import { ADMIN, assertRole, callable, type Caller } from './lib/guard';
 import { notify, notifySchoolAdmins } from './lib/notify';
 import { buildSlots, slotId, slotRangeError } from './lib/slots';
+import { canTeach } from './lib/teaching';
 import { DAY_MS, HOUR_MS, istDate, istLabel } from './lib/time';
 
 const isAdminCaller = (c: Caller) => c.isSuperAdmin || c.role === 'owner' || c.role === 'staff';
@@ -35,8 +36,8 @@ export const generateSlots = callable(generateSlotsSchema, async (data, request)
   const school = await getSchool(data.schoolId);
   assertSchoolUsable(school);
   const instructor = await getMember(data.schoolId, data.instructorId);
-  if (instructor.role !== 'instructor' || !instructor.active) {
-    throw new HttpsError('failed-precondition', 'Slots can only be generated for active instructors.');
+  if (!canTeach(instructor)) {
+    throw new HttpsError('failed-precondition', 'Slots can only be generated for active instructors (or members who also teach).');
   }
   const availability = as<Availability>(await subDoc(data.schoolId, 'availability', data.instructorId).get());
   if (!availability) throw new HttpsError('failed-precondition', 'Set weekly availability for this instructor first.');

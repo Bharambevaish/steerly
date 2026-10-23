@@ -17,9 +17,9 @@ npm run test -w steerly-functions      # vitest, pure logic in src/lib
 | `onboarding.ts` | `createSchool` | signed-in user without a school (or superAdmin) |
 | | `joinSchool` | signed-in user without a school (6-char code) |
 | | `inviteMember` | owner; staff may invite instructors |
-| | `updateMember` | owner (role / active; deactivation clears claims and revokes tokens) |
+| | `updateMember` | owner (role / active; deactivation clears claims and revokes tokens). An owner may demote themselves if another active owner remains; `school.ownerUid` moves to that owner |
 | `students.ts` | `createStudent`, `convertEnquiry` | owner, staff |
-| `scheduling.ts` | `generateSlots` | admin or that instructor |
+| `scheduling.ts` | `generateSlots` | admin or that instructor; target must be an active instructor or an owner/staff with `teaches: true` |
 | | `bookSlot` | student (self) or admin |
 | | `cancelBooking` | student (≥ `cancelBeforeHours` ahead), instructor, admin |
 | | `completeBooking` | assigned instructor or admin |
@@ -28,13 +28,35 @@ npm run test -w steerly-functions      # vitest, pure logic in src/lib
 | | `recordManualPayment` | admin |
 | | `getReceiptUrl` | admin or the student (15-min signed URL) |
 | | `razorpayWebhook` (HTTP) | Razorpay (signature verified) |
-| `reports.ts` | `getDashboardStats` | admin |
+| `reports.ts` | `getDashboardStats` | admin (`lessonsByInstructor` includes owners/staff who teach) |
 | `platform.ts` | `startSubscription` | owner |
 | | `setSchoolStatus` | superAdmin |
 | `account.ts` | `deleteMyAccount` | any signed-in non-owner |
 | `triggers.ts` | `onEnquiryCreated` | new enquiry (app/web) → admins |
 | | `lessonReminders` | every 15 min: lessons starting within 2 h |
 | | `dailyDigest` | 08:00 IST: vehicle expiries (15/7/3/1/0 days), test dates tomorrow, follow-ups today, trial/past-due/suspension |
+| `members.ts` | `onMemberUpdated` | member renamed → `instructorName` on their students, upcoming slots and `booked` bookings (batched ≤ 500) |
+| `dev.ts` | `devRunScheduled` (HTTP) | **emulator only** (exported only when `FUNCTIONS_EMULATOR=true`, never deployed) |
+
+### "Also teaches"
+
+`members/{uid}.teaches === true` makes an owner/staff member an instructor too. Always use
+`canTeach(member)` from `src/lib/teaching.ts` instead of checking `role === 'instructor'` (slot generation,
+instructor assignment on students). Notifications and `completeBooking` key off `booking.instructorId`, so they
+work for any teaching member. Owners set `teaches` directly in Firestore (allowed by the rules).
+
+### Scheduled jobs
+
+The schedule handlers are thin wrappers around `runLessonReminders(nowMs)` and `runDailyDigest(nowMs)`
+(`src/triggers.ts`), which return counts. In the emulator, run them on demand:
+
+```
+curl "http://127.0.0.1:5001/demo-steerly/asia-south1/devRunScheduled?job=lessonReminders&now=1767000000000"
+curl "http://127.0.0.1:5001/demo-steerly/asia-south1/devRunScheduled?job=dailyDigest"      # now defaults to Date.now()
+```
+
+Subscription rules in `dailyDigest`: trial ending in 3 days → reminder; trial ended → `past_due`; trial or
+paid period ended more than 7 days ago → `suspended`.
 
 ## Configuration
 
@@ -83,6 +105,18 @@ firebase emulators:start
 
 With `OTP_DEV_MODE=true`, `requestOtp` returns `{ sent: true, devCode }`. Numbers in `OTP_TEST_NUMBERS`
 always accept `123456` (no SMS is sent, in any mode).
+
+End-to-end test (all flows, rules, triggers and scheduled jobs) and demo data:
+
+```
+npx firebase emulators:exec --project demo-steerly --only auth,functions,firestore,storage "node scripts/e2e.mjs"
+npm run emulators            # terminal 1
+node scripts/seed.mjs        # terminal 2: "Prince Driving School" (Pune) demo data; prints the logins
+```
+
+The seed only talks to the emulators (project `demo-steerly`) and is a no-op if it has already run. Demo logins:
+owner `9000000001`, instructors `9000000002` / `9000000003`, students `9000000011`–`9000000022`. Add the ones you
+use to `OTP_TEST_NUMBERS` in `functions/.env.local` to log in with `123456`.
 
 ## Deploy notes
 

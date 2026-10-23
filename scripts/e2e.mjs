@@ -446,6 +446,181 @@ await step('a school owner cannot use another school\'s data', async () => {
   await expectFail(other.call('createStudent', { schoolId: ctx.schoolId, courseId: ctx.course.id, name: 'Xavier', phone: phone(0) }), 'permission-denied');
 });
 
+// ---------- 11. Member rename + "also teaches" ----------
+console.log('Team (rename, also teaches)');
+const istYmd = (ms) => new Date(ms + 5.5 * 3600e3).toISOString().slice(0, 10);
+const istAt = (ymd, hm = '12:00') => Date.parse(`${ymd}T${hm}:00+05:30`);
+const addYmd = (ymd, n) => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * 86400e3).toISOString().slice(0, 10);
+const inbox = async (uid, pred = () => true) =>
+  (await adb.collection(`users/${uid}/notifications`).get()).docs.map((d) => d.data()).filter(pred);
+const devRun = async (job, now) => {
+  const res = await fetch(`http://${HOST}:5001/${PROJECT}/${REGION}/devRunScheduled?job=${job}&now=${now}`);
+  const text = await res.text();
+  assert(res.ok, `devRunScheduled ${job}: ${res.status} ${text}`);
+  return JSON.parse(text).result;
+};
+
+await step('renaming an instructor updates students, upcoming slots and booked lessons (trigger)', async () => {
+  const { bookingId } = await student2.call('bookSlot', { schoolId: ctx.schoolId, slotId: ctx.slotB.id });
+  ctx.renameBookingId = bookingId;
+  await updateDoc(doc(owner.db, `${S('members')}/${ctx.instructorUid}`), { name: 'Ishaan Iyer' });
+  await waitFor(async () => (await adb.doc(`${S('bookings')}/${bookingId}`).get()).data().instructorName === 'Ishaan Iyer', 'booking renamed');
+  const s = (await adb.doc(`${S('students')}/${ctx.studentId}`).get()).data();
+  assert(s.instructorName === 'Ishaan Iyer', `student instructorName, got ${s.instructorName}`);
+  const slots = await adb.collection(S('slots')).where('instructorId', '==', ctx.instructorUid).get();
+  const upcoming = slots.docs.map((d) => d.data()).filter((x) => x.start.toMillis() >= Date.now());
+  assert(upcoming.length > 0 && upcoming.every((x) => x.instructorName === 'Ishaan Iyer'), 'all upcoming slots renamed');
+  const done = (await adb.doc(`${S('bookings')}/${ctx.bookingId}`).get()).data();
+  assert(done.instructorName === 'Ishaan Instructor', 'completed lesson keeps the old name');
+});
+await step('owner without "teaches" cannot get slots; with teaches=true can', async () => {
+  ctx.ownerUid = owner.auth.currentUser.uid;
+  const day = [{ start: '15:00', end: '17:00' }];
+  await setDoc(doc(owner.db, `${S('availability')}/${ctx.ownerUid}`), {
+    instructorId: ctx.ownerUid, weekly: { mon: day, tue: day, wed: day, thu: day, fri: day, sat: day, sun: day }, vehicleId: null, updatedAt: serverTimestamp(),
+  });
+  const from = istYmd(Date.now() + 86400e3);
+  const to = istYmd(Date.now() + 3 * 86400e3);
+  await expectFail(owner.call('generateSlots', { schoolId: ctx.schoolId, instructorId: ctx.ownerUid, from, to }), 'failed-precondition');
+  await updateDoc(doc(owner.db, `${S('members')}/${ctx.ownerUid}`), { teaches: true });
+  const out = await owner.call('generateSlots', { schoolId: ctx.schoolId, instructorId: ctx.ownerUid, from, to });
+  assert(out.created === 3 * 2, `6 owner slots, got ${out.created}`);
+  const slot = (await adb.collection(S('slots')).where('instructorId', '==', ctx.ownerUid).limit(1).get()).docs[0].data();
+  assert(slot.instructorName === 'Olivia Owner', `owner slot instructorName, got ${slot.instructorName}`);
+});
+await step('a teaching owner can be assigned to a student', async () => {
+  const { studentId } = await owner.call('createStudent', {
+    schoolId: ctx.schoolId, courseId: ctx.course.id, name: 'Tara Teachee', phone: `8${run}1234`.slice(0, 10), instructorId: ctx.ownerUid,
+  });
+  const s = (await adb.doc(`${S('students')}/${studentId}`).get()).data();
+  assert(s.instructorId === ctx.ownerUid && s.instructorName === 'Olivia Owner', 'owner assigned as instructor');
+});
+await step('teaching owner gets the booking alert, completes the lesson, shows on the dashboard', async () => {
+  const slots = (await adb.collection(S('slots')).where('instructorId', '==', ctx.ownerUid).get()).docs.map((d) => d.data());
+  const slot = slots.find((x) => x.status === 'open');
+  const { bookingId } = await owner.call('bookSlot', { schoolId: ctx.schoolId, slotId: slot.id, studentId: ctx.studentId });
+  const alerts = await inbox(ctx.ownerUid, (n) => n.type === 'booking' && n.link === `/bookings/${bookingId}`);
+  assert(alerts.length === 1, `owner notified as the lesson's instructor, got ${alerts.length}`);
+  const before = (await adb.doc(`${S('students')}/${ctx.studentId}`).get()).data().sessionsCompleted;
+  await adb.doc(`${S('bookings')}/${bookingId}`).update({ start: Timestamp.fromMillis(Date.now() - 1800e3), end: Timestamp.fromMillis(Date.now() - 60e3) });
+  await owner.call('completeBooking', {
+    schoolId: ctx.schoolId, bookingId, attendance: 'present', skillsCovered: ['parking'], skillLevels: { parking: 1 }, notes: 'Parking basics',
+  });
+  const after = (await adb.doc(`${S('students')}/${ctx.studentId}`).get()).data();
+  assert(after.sessionsCompleted === before + 1 && after.skills.parking === 1, 'progress updated');
+  const st = await owner.call('getDashboardStats', {
+    schoolId: ctx.schoolId, from: new Date(Date.now() - 86400e3).toISOString(), to: new Date(Date.now() + 86400e3).toISOString(),
+  });
+  const row = st.lessonsByInstructor.find((r) => r.instructorId === ctx.ownerUid);
+  assert(row && row.name === 'Olivia Owner' && row.completed === 1, `owner in lessonsByInstructor, got ${JSON.stringify(st.lessonsByInstructor)}`);
+});
+
+// ---------- 12. Scheduled jobs (via emulator-only devRunScheduled) ----------
+console.log('Scheduled jobs');
+await step('devRunScheduled rejects an unknown job', async () => {
+  const res = await fetch(`http://${HOST}:5001/${PROJECT}/${REGION}/devRunScheduled?job=nope`);
+  assert(res.status === 400, `400, got ${res.status}`);
+});
+await step('lessonReminders reminds student + instructor once for a lesson within 2h', async () => {
+  // Fixture: a booked lesson far in the future, then run the job with `now` 90 min before it.
+  const start = Date.now() + 40 * 86400e3;
+  const ref = adb.collection(S('bookings')).doc();
+  await ref.set({
+    id: ref.id, slotId: `fixture_${ref.id}`, studentId: ctx.studentId, studentName: 'Sara Student', studentPhone: PHONES.student,
+    instructorId: ctx.instructorUid, instructorName: 'Ishaan Iyer', vehicleId: null,
+    start: Timestamp.fromMillis(start), end: Timestamp.fromMillis(start + 3600e3), status: 'booked',
+    cancelledBy: null, cancelReason: null, skillsCovered: [], instructorNotes: '', rating: null, feedback: null,
+    reminderSent: false, createdAt: Timestamp.now(),
+  });
+  const first = await devRun('lessonReminders', start - 90 * 60e3);
+  assert(first.sent === 1, `1 reminder sent, got ${JSON.stringify(first)}`);
+  assert((await ref.get()).data().reminderSent === true, 'reminderSent set');
+  const second = await devRun('lessonReminders', start - 60 * 60e3);
+  assert(second.sent === 0, `nothing re-sent, got ${JSON.stringify(second)}`);
+  const link = `/bookings/${ref.id}`;
+  const sUid = student.auth.currentUser.uid;
+  const forStudent = await inbox(sUid, (n) => n.type === 'lesson_reminder' && n.link === link);
+  const forInstructor = await inbox(ctx.instructorUid, (n) => n.type === 'lesson_reminder' && n.link === link);
+  assert(forStudent.length === 1 && forInstructor.length === 1, `one reminder each, got ${forStudent.length}/${forInstructor.length}`);
+  assert(forStudent[0].body.includes('Ishaan Iyer'), 'reminder names the instructor');
+});
+await step('lessonReminders ignores lessons more than 2h away', async () => {
+  const start = Date.now() + 50 * 86400e3;
+  const ref = adb.collection(S('bookings')).doc();
+  await ref.set({
+    id: ref.id, slotId: `fixture_${ref.id}`, studentId: ctx.studentId, studentName: 'Sara Student', studentPhone: PHONES.student,
+    instructorId: ctx.instructorUid, instructorName: 'Ishaan Iyer', vehicleId: null,
+    start: Timestamp.fromMillis(start), end: Timestamp.fromMillis(start + 3600e3), status: 'booked',
+    cancelledBy: null, cancelReason: null, skillsCovered: [], instructorNotes: '', rating: null, feedback: null,
+    reminderSent: false, createdAt: Timestamp.now(),
+  });
+  const out = await devRun('lessonReminders', start - 3 * 3600e3);
+  assert(out.due === 0, `nothing due, got ${JSON.stringify(out)}`);
+  assert((await ref.get()).data().reminderSent === false, 'reminderSent untouched');
+});
+await step('dailyDigest: vehicle expiry, LL test tomorrow, follow-up today, trial reminders + suspension', async () => {
+  const now = Date.now();
+  const today = istYmd(now);
+  // Fixtures (admin SDK)
+  const reg = `MH12E${run}`;
+  await adb.doc(`${S('vehicles')}/fixture-${run}`).set({
+    id: `fixture-${run}`, regNumber: reg, model: 'Swift', type: 'car_manual', branchId: null,
+    insuranceExpiry: Timestamp.fromMillis(istAt(addYmd(today, 7))), pucExpiry: null, fitnessExpiry: null, active: true,
+  });
+  await adb.doc(`${S('students')}/${ctx.studentId}`).update({ llStatus: 'scheduled', llTestDate: Timestamp.fromMillis(istAt(addYmd(today, 1), '10:30')) });
+  const enqRef = adb.collection(S('enquiries')).doc();
+  await enqRef.set({
+    id: enqRef.id, name: `Farah Followup ${run}`, phone: phone(8), courseId: ctx.course.id, courseName: ctx.course.name, preferredTime: 'Evening',
+    status: 'Contacted', source: 'phone', notes: '', followUpAt: Timestamp.fromMillis(istAt(today, '18:00')), studentId: null,
+    createdAt: Timestamp.now(), updatedAt: null,
+  });
+  const fixtureSchool = (id, ownerUid, trialEndsAt) => adb.doc(`schools/${id}`).set({
+    id, name: `Fixture ${id}`, slug: id, code: 'ZZZZZZ', ownerUid, city: 'Pune', phone: '9000000000', address: '', email: null,
+    logoUrl: null, brandColor: '#F59E0B', settings: {}, createdAt: Timestamp.now(),
+    subscription: { plan: 'starter', status: 'trial', trialEndsAt: Timestamp.fromMillis(trialEndsAt), currentPeriodEnd: null, razorpaySubscriptionId: null },
+  });
+  const trial3 = { id: `fx-trial3-${run}`, owner: `fx-owner3-${run}` };
+  const trial8 = { id: `fx-trial8-${run}`, owner: `fx-owner8-${run}` };
+  await fixtureSchool(trial3.id, trial3.owner, istAt(addYmd(today, 3), '20:00'));
+  await fixtureSchool(trial8.id, trial8.owner, now - 8 * 86400e3);
+
+  const result = await devRun('dailyDigest', now);
+  assert(Object.values(result).every((n) => n >= 0), `no sub-job failed: ${JSON.stringify(result)}`);
+
+  const ownerInbox = await inbox(ctx.ownerUid);
+  assert(ownerInbox.some((n) => n.title === 'Vehicle documents expiring' && n.body.includes(`${reg}: Insurance expires in 7 day(s)`)), 'vehicle expiry alert');
+  assert(ownerInbox.some((n) => n.type === 'test_date' && n.body.includes('Sara Student')), 'admin told about LL test');
+  assert(ownerInbox.some((n) => n.title === 'Enquiry follow-ups' && n.body.includes(`Farah Followup ${run}`)), 'follow-up alert');
+  const sInbox = await inbox(student.auth.currentUser.uid, (n) => n.type === 'test_date');
+  assert(sInbox.some((n) => n.title === "Learner's licence test tomorrow"), 'student told about LL test');
+  assert((await inbox(trial3.owner)).some((n) => n.title === 'Your trial ends in 3 days'), 'trial-ending reminder');
+  assert((await adb.doc(`schools/${trial3.id}`).get()).data().subscription.status === 'trial', 'trial school still on trial');
+  const s8 = (await adb.doc(`schools/${trial8.id}`).get()).data();
+  assert(s8.subscription.status === 'suspended', `school 8 days past trial suspended, got ${s8.subscription.status}`);
+  assert((await inbox(trial8.owner)).some((n) => n.title === 'School suspended'), 'suspension notice');
+});
+
+// ---------- 13. Owner steps down ----------
+console.log('Ownership');
+await step('sole owner cannot demote themselves', async () => {
+  await expectFail(owner.call('updateMember', { schoolId: ctx.schoolId, uid: ctx.ownerUid, role: 'staff' }), 'failed-precondition');
+});
+await step('owner demotes themselves to staff once a co-owner exists (ownerUid handed over)', async () => {
+  const coOwner = actor('co-owner');
+  const coPhone = `7${run}2222`.slice(0, 10);
+  await owner.call('inviteMember', { schoolId: ctx.schoolId, phone: coPhone, name: 'Chetan Co-owner', role: 'owner' });
+  const c = await coOwner.login(coPhone);
+  assert(c.role === 'owner' && c.schoolId === ctx.schoolId, `co-owner claims, got ${JSON.stringify(c)}`);
+  await expectFail(owner.call('updateMember', { schoolId: ctx.schoolId, uid: ctx.ownerUid, active: false }), 'failed-precondition');
+  await owner.call('updateMember', { schoolId: ctx.schoolId, uid: ctx.ownerUid, role: 'staff' });
+  const claims = await owner.claims();
+  assert(claims.role === 'staff' && claims.schoolId === ctx.schoolId, `demoted claims, got ${JSON.stringify(claims)}`);
+  const m = (await adb.doc(`${S('members')}/${ctx.ownerUid}`).get()).data();
+  assert(m.role === 'staff' && m.active && m.teaches === true, 'member is active staff who still teaches');
+  const school = (await adb.doc(`schools/${ctx.schoolId}`).get()).data();
+  assert(school.ownerUid === coOwner.auth.currentUser.uid, 'school.ownerUid moved to the co-owner');
+});
+
 // ---------- summary ----------
 await Promise.all(apps.map((a) => deleteApp(a).catch(() => {})));
 const failed = results.filter((r) => !r.ok);

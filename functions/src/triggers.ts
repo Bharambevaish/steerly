@@ -26,26 +26,37 @@ export const onEnquiryCreated = onDocumentCreated('schools/{schoolId}/enquiries/
 
 // ---------- Lesson reminders (every 15 min) ----------
 
-export const lessonReminders = onSchedule({ schedule: 'every 15 minutes', timeZone: TIMEZONE, secrets: [AISENSY_API_KEY] }, async () => {
-  const now = Date.now();
+export interface LessonRemindersResult {
+  due: number;
+  sent: number;
+}
+
+/** Reminds student + instructor of every booked lesson starting in (nowMs, nowMs + 2h]. Each booking at most once. */
+export async function runLessonReminders(nowMs: number): Promise<LessonRemindersResult> {
   const snap = await db
     .collectionGroup('bookings')
     .where('status', '==', 'booked')
     .where('reminderSent', '==', false)
-    .where('start', '>', Timestamp.fromMillis(now))
-    .where('start', '<=', Timestamp.fromMillis(now + 2 * HOUR_MS))
+    .where('start', '>', Timestamp.fromMillis(nowMs))
+    .where('start', '<=', Timestamp.fromMillis(nowMs + 2 * HOUR_MS))
     .get();
+  let sent = 0;
   for (const doc of snap.docs) {
     try {
-      await remindBooking(doc);
+      if (await remindBooking(doc)) sent++;
     } catch (err) {
       logger.error('lessonReminders: failed for booking', { path: doc.ref.path, err });
     }
   }
-  logger.info(`lessonReminders: ${snap.size} reminder(s)`);
+  logger.info(`lessonReminders: ${sent}/${snap.size} reminder(s) sent`);
+  return { due: snap.size, sent };
+}
+
+export const lessonReminders = onSchedule({ schedule: 'every 15 minutes', timeZone: TIMEZONE, secrets: [AISENSY_API_KEY] }, async () => {
+  await runLessonReminders(Date.now());
 });
 
-async function remindBooking(doc: QueryDocumentSnapshot): Promise<void> {
+async function remindBooking(doc: QueryDocumentSnapshot): Promise<boolean> {
   const b = doc.data() as Booking;
   const schoolId = schoolIdOf(doc.ref);
   // Claim the reminder first so overlapping runs never double-send.
@@ -55,7 +66,7 @@ async function remindBooking(doc: QueryDocumentSnapshot): Promise<void> {
     tx.update(doc.ref, { reminderSent: true });
     return true;
   });
-  if (!claimed) return;
+  if (!claimed) return false;
   const student = as<Student>(await subDoc(schoolId, 'students', b.studentId).get());
   const when = istLabel(b.start.toMillis());
   const link = `/bookings/${b.id}`;
@@ -68,6 +79,7 @@ async function remindBooking(doc: QueryDocumentSnapshot): Promise<void> {
     userName: b.studentName,
     params: [b.studentName, b.instructorName, when, school?.name ?? 'your driving school'],
   });
+  return true;
 }
 
 // ---------- Daily digest (08:00 IST) ----------
@@ -80,7 +92,7 @@ const VEHICLE_FIELDS = [
 /** Alert on these days-left values only, so admins aren't nagged every day. */
 const EXPIRY_ALERT_DAYS = new Set([15, 7, 3, 1, 0]);
 
-async function vehicleExpiries(today: string): Promise<void> {
+async function vehicleExpiries(today: string): Promise<number> {
   const start = Timestamp.fromMillis(istDayStart(today));
   const end = Timestamp.fromMillis(istDayStart(addDays(today, 16)));
   const bySchool = new Map<string, string[]>();
@@ -100,9 +112,11 @@ async function vehicleExpiries(today: string): Promise<void> {
   for (const [sid, lines] of bySchool) {
     await notifySchoolAdmins(sid, { title: 'Vehicle documents expiring', body: lines.join('\n'), type: 'general', link: '/vehicles' });
   }
+  return bySchool.size;
 }
 
-async function testDatesTomorrow(today: string): Promise<void> {
+async function testDatesTomorrow(today: string): Promise<number> {
+  let count = 0;
   const tomorrow = addDays(today, 1);
   const start = Timestamp.fromMillis(istDayStart(tomorrow));
   const end = Timestamp.fromMillis(istDayStart(addDays(tomorrow, 1)));
@@ -115,11 +129,13 @@ async function testDatesTomorrow(today: string): Promise<void> {
       const when = istLabel(s[field]?.toMillis() ?? start.toMillis());
       await notify(s.uid, { title: `${label} tomorrow`, body: `Your ${label.toLowerCase()} is on ${when}. All the best!`, type: 'test_date', link: '/progress' });
       await notifySchoolAdmins(sid, { title: `${label} tomorrow`, body: `${s.name} – ${when}`, type: 'test_date', link: `/students/${s.id}` });
+      count++;
     }
   }
+  return count;
 }
 
-async function followUpsToday(today: string): Promise<void> {
+async function followUpsToday(today: string): Promise<number> {
   const start = Timestamp.fromMillis(istDayStart(today));
   const end = Timestamp.fromMillis(istDayStart(addDays(today, 1)));
   const snap = await db.collectionGroup('enquiries').where('followUpAt', '>=', start).where('followUpAt', '<', end).get();
@@ -134,10 +150,22 @@ async function followUpsToday(today: string): Promise<void> {
     const body = names.length === 1 ? `Follow up with ${names[0]} today.` : `${names.length} follow-ups today: ${names.slice(0, 5).join(', ')}${names.length > 5 ? '…' : ''}`;
     await notifySchoolAdmins(sid, { title: 'Enquiry follow-ups', body, type: 'enquiry', link: '/enquiries' });
   }
+  return bySchool.size;
 }
 
-async function subscriptionChecks(today: string, now: number): Promise<void> {
+/** Days of grace after a trial or paid period ends before the school is suspended. */
+const GRACE_DAYS = 7;
+
+const SUSPENDED_NOTICE = {
+  title: 'School suspended',
+  body: 'Your Steerly subscription is overdue, so your school has been suspended. Choose a plan to reactivate it.',
+  type: 'general',
+  link: '/settings/billing',
+} as const;
+
+async function subscriptionChecks(today: string, now: number): Promise<number> {
   const snap = await db.collection(COLLECTIONS.schools).where('subscription.status', 'in', ['trial', 'past_due']).get();
+  let changed = 0;
   for (const doc of snap.docs) {
     const school = doc.data() as School;
     const s = school.subscription;
@@ -151,47 +179,59 @@ async function subscriptionChecks(today: string, now: number): Promise<void> {
             type: 'general',
             link: '/settings/billing',
           });
+          changed++;
+        } else if (trialEnd && trialEnd + GRACE_DAYS * DAY_MS < now) {
+          // Trial ended more than the grace period ago (e.g. a missed run): suspend straight away.
+          await schoolRef(school.id).update({ 'subscription.status': 'suspended' });
+          await notify(school.ownerUid, SUSPENDED_NOTICE);
+          changed++;
         } else if (trialEnd && trialEnd <= now) {
           await schoolRef(school.id).update({ 'subscription.status': 'past_due' });
           await notify(school.ownerUid, {
             title: 'Your trial has ended',
-            body: 'Choose a plan within 7 days to keep your school active.',
+            body: `Choose a plan within ${GRACE_DAYS} days to keep your school active.`,
             type: 'general',
             link: '/settings/billing',
           });
+          changed++;
         }
       } else {
         const since = Math.max(trialEnd, s.currentPeriodEnd?.toMillis() ?? 0);
-        if (since && since + 7 * DAY_MS < now) {
+        if (since && since + GRACE_DAYS * DAY_MS < now) {
           await schoolRef(school.id).update({ 'subscription.status': 'suspended' });
-          await notify(school.ownerUid, {
-            title: 'School suspended',
-            body: 'Your Steerly subscription is overdue, so your school has been suspended. Choose a plan to reactivate it.',
-            type: 'general',
-            link: '/settings/billing',
-          });
+          await notify(school.ownerUid, SUSPENDED_NOTICE);
+          changed++;
         }
       }
     } catch (err) {
       logger.error('subscriptionChecks failed for school', { schoolId: school.id, err });
     }
   }
+  return changed;
 }
 
-export const dailyDigest = onSchedule({ schedule: '0 8 * * *', timeZone: TIMEZONE, timeoutSeconds: 540 }, async () => {
-  const now = Date.now();
-  const today = istDate(now);
-  const jobs: [string, () => Promise<void>][] = [
+/** Daily admin digest for the IST calendar day of `nowMs`. Returns a count per sub-job (-1 = failed). */
+export async function runDailyDigest(nowMs: number): Promise<Record<string, number>> {
+  const today = istDate(nowMs);
+  const jobs: [string, () => Promise<number>][] = [
     ['vehicleExpiries', () => vehicleExpiries(today)],
     ['testDatesTomorrow', () => testDatesTomorrow(today)],
     ['followUpsToday', () => followUpsToday(today)],
-    ['subscriptionChecks', () => subscriptionChecks(today, now)],
+    ['subscriptionChecks', () => subscriptionChecks(today, nowMs)],
   ];
+  const result: Record<string, number> = {};
   for (const [name, job] of jobs) {
     try {
-      await job();
+      result[name] = await job();
     } catch (err) {
+      result[name] = -1;
       logger.error(`dailyDigest: ${name} failed`, err);
     }
   }
+  logger.info('dailyDigest done', result);
+  return result;
+}
+
+export const dailyDigest = onSchedule({ schedule: '0 8 * * *', timeZone: TIMEZONE, timeoutSeconds: 540 }, async () => {
+  await runDailyDigest(Date.now());
 });

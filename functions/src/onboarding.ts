@@ -24,7 +24,7 @@ import {
 import { auth, db } from './lib/admin';
 import { setClaims } from './lib/claims';
 import { generateCode, receiptPrefixFromName, slugCandidates } from './lib/codes';
-import { as, assertSchoolUsable, getSchool, sub, subDoc, userRef } from './lib/data';
+import { as, assertSchoolUsable, getSchool, schoolRef, sub, subDoc, userRef } from './lib/data';
 import { ADMIN, assertRole, callable, OWNER, requireAuth } from './lib/guard';
 import { buildStudent, findStudentByPhone } from './lib/studentRecord';
 import { DAY_MS } from './lib/time';
@@ -236,8 +236,10 @@ export const updateMember = callable(updateMemberSchema, async (data, request): 
   const ref = subDoc(data.schoolId, 'members', data.uid);
   const member = as<Member>(await ref.get());
   if (!member) throw new HttpsError('not-found', 'Member not found.');
-  if (data.uid === caller.uid && (data.active === false || (data.role && data.role !== 'owner'))) {
-    throw new HttpsError('failed-precondition', "You can't remove your own owner access.");
+  // Owners may step down to staff/instructor themselves (checked below: another active owner must remain),
+  // but can't deactivate their own account.
+  if (data.uid === caller.uid && data.active === false) {
+    throw new HttpsError('failed-precondition', "You can't deactivate your own account. Ask another owner to do it.");
   }
 
   const role = data.role ?? member.role;
@@ -246,6 +248,9 @@ export const updateMember = callable(updateMemberSchema, async (data, request): 
     const owners = await sub(data.schoolId, 'members').where('role', '==', 'owner').get();
     const activeOwners = owners.docs.map((d) => d.data() as Member).filter((m) => m.active && m.uid !== data.uid);
     if (activeOwners.length === 0) throw new HttpsError('failed-precondition', 'A school needs at least one active owner.');
+    // Billing/trial notices go to school.ownerUid; hand it to a remaining owner.
+    const school = await getSchool(data.schoolId);
+    if (school.ownerUid === data.uid) await schoolRef(data.schoolId).update({ ownerUid: activeOwners[0].uid });
   }
 
   await ref.update({ role, active });

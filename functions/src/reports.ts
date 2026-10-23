@@ -25,7 +25,8 @@ export const getDashboardStats = callable(getDashboardStatsSchema, async (data, 
       .get(),
     sub(sid, 'bookings').where('start', '>=', from).where('start', '<', to).select('status', 'instructorId', 'instructorName', 'rating').get(),
     sub(sid, 'payments').where('status', '==', 'paid').where('paidAt', '>=', from).where('paidAt', '<', to).select('amount', 'paidAt').get(),
-    sub(sid, 'members').where('role', '==', 'instructor').get(),
+    // All members: instructors plus owners/staff who also teach (names for lessonsByInstructor).
+    sub(sid, 'members').get(),
   ]);
 
   // Enquiries
