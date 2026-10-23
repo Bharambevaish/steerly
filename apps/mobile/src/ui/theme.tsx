@@ -54,8 +54,9 @@ export interface Theme {
   font: { display: string; displayMedium: string; body: string; bodyMedium: string; bodySemi: string; bodyBold: string };
 }
 
-function isHex(c: string | null | undefined): c is string {
-  return !!c && /^#([0-9a-f]{6})$/i.test(c);
+function isHex(c: unknown): c is string {
+  // typeof check first: RegExp.test() would coerce e.g. ['#7C3AED'] to a passing string.
+  return typeof c === 'string' && /^#([0-9a-f]{6})$/i.test(c);
 }
 
 function hexToRgb(hex: string) {

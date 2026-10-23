@@ -19,4 +19,7 @@ export const APP_VERSION: string = Constants.expoConfig?.version ?? '0.0.0';
 export const ADMIN_URL: string = process.env.EXPO_PUBLIC_ADMIN_URL || 'https://admin.steerly.app';
 
 /** Build-time brand (APP_BRAND_COLOR) until the school's own brandColor loads. */
-export const DEFAULT_BRAND: string = (Constants.expoConfig?.extra as { brandColor?: string } | undefined)?.brandColor || '#F59E0B';
+// Only trust a real "#RRGGBB" string: on web the manifest's extra values aren't guaranteed to be strings.
+const configuredBrand: unknown = (Constants.expoConfig?.extra as { brandColor?: unknown } | undefined)?.brandColor;
+export const DEFAULT_BRAND: string =
+  typeof configuredBrand === 'string' && /^#[0-9a-f]{6}$/i.test(configuredBrand) ? configuredBrand : '#F59E0B';
