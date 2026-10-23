@@ -5,6 +5,22 @@ Status: ⬜ to do · ✅ done
 
 ---
 
+## ★ Start here: see the whole product on your laptop (no accounts needed)
+
+Needs Java 21 (already installed by Claude at `%LOCALAPPDATA%\Programs\jdk21`). In PowerShell:
+
+```powershell
+$env:JAVA_HOME="$env:LOCALAPPDATA\Programs\jdk21\jdk-21.0.12.1+1"; $env:PATH="$env:JAVA_HOME\bin;$env:PATH"; $env:FUNCTIONS_DISCOVERY_TIMEOUT=60
+npm run emulators          # terminal 1 — leave running
+npm run seed               # terminal 2 — creates a demo "Prince Driving School"
+npm run admin:emulator     # terminal 2 — dashboard at http://localhost:5173
+```
+
+Log in on the dashboard with phone **9000000001**, OTP **123456** (owner). Instructors: 9000000002 / 9000000003 (OTP 123456, mobile app).
+Mobile in the browser: copy `apps/mobile/.env.emulator.example` to `apps/mobile/.env.local`, then `cd apps/mobile && npx expo start --web`.
+
+---
+
 ## A. Accounts to create (one-time)
 
 | # | Task | Why | Status |
@@ -42,8 +58,8 @@ Status: ⬜ to do · ✅ done
 
 | B9 | *(Optional, WhatsApp)* AiSensy account → create 3 API campaigns with approved templates, put names in `WHATSAPP_CAMPAIGN_LESSON_REMINDER/PAYMENT_LINK/RECEIPT`, set `WHATSAPP_ENABLED=true`:<br>1. Lesson reminder: "Hi {{1}}, reminder: your driving lesson with {{2}} is at {{3}}. – {{4}}" (student, instructor, time, school)<br>2. Payment link: "Hi {{1}}, please pay {{2}} for {{3}} at {{4}} using this secure link: {{5}}" (student, amount, course, school, link)<br>3. Receipt: "Hi {{1}}, we received {{2}} at {{3}}. Receipt no. {{4}}. Balance due: {{5}}. Thank you!" (student, amount, school, receipt no, balance) | ⬜ |
 
-| B10 | Mobile: `cd apps/mobile && npx eas init`, then put the project id in `EAS_PROJECT_ID` in `apps/mobile/.env.local`. Set `EXPO_PUBLIC_ADMIN_URL` to your live admin URL | ⬜ |
-| B11 | Push notifications: in expo.dev → your project → Credentials, upload the **FCM v1** service-account key (Android) and, for iOS later, APNs. Push does **not** work in Expo Go — test with a development build: `npx eas build -p android --profile development` | ⬜ |
+| B10 | Mobile: `cd apps/mobile`, `npx eas login`, `npx eas init`, then set `EAS_PROJECT_ID`. Add the Firebase web config to EAS for each profile: `npx eas env:create` for every `EXPO_PUBLIC_FIREBASE_*` value, plus `GOOGLE_SERVICES_JSON` as a file variable (download `google-services.json` from Firebase → Android app). Set `EXPO_PUBLIC_ADMIN_URL`. Full guide: `apps/mobile/README.md` | ⬜ |
+| B11 | Push notifications: `npx eas credentials` → Android → upload the **FCM v1** service-account key (iOS later: APNs). Test push on a development build: `npx eas build -p android --profile development` (doesn't work in Expo Go) | ⬜ |
 | B12 | White-label app for a school (e.g. Prince): build with `EXPO_PUBLIC_SCHOOL_ID=<schoolId>`, `EXPO_PUBLIC_APP_NAME="Prince Driving School"`, `APP_BUNDLE_ID=app.steerly.prince` and its own icon | ⬜ |
 
 ## C. Before going live
@@ -72,4 +88,4 @@ Status: ⬜ to do · ✅ done
 
 ---
 
-_Last updated by Claude (2026-10-23): brand assets + admin updates committed. Backend (teaches/rename sync/scheduled-job tests/seed) and mobile (EAS/web/offline/teaches) work was paused by the usage limit and is UNCOMMITTED in functions/, scripts/, apps/mobile/ — Claude will verify and commit it next session._
+_Last updated by Claude (2026-10-23): everything buildable without your accounts is done and committed on branch `build/phases-1-6`. The remaining items above need your accounts, money, legal review or decisions._
