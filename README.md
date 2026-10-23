@@ -44,7 +44,7 @@ npm run web         # website at http://localhost:5174
 
 Other scripts: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build:admin`, `npm run build:functions`.
 
-Note: typed routes are off in `apps/mobile/app.json` because npm keeps `expo-router` inside `apps/mobile/node_modules` in this workspace layout; the app runs and bundles normally.
+Also: `npm run seed` (demo school on the emulators), `npm run brand` (regenerate logo/icons), `npm run admin:emulator` (dashboard against the emulators).
 
 ## Test everything locally (Firebase emulators)
 
@@ -56,7 +56,7 @@ Needs **Java 21+** (`java -version`). No Firebase account needed: the emulators 
    $env:FUNCTIONS_DISCOVERY_TIMEOUT=60   # OneDrive makes the first load slow
    npm run emulators                     # UI at http://127.0.0.1:4000
    ```
-3. Terminal 2: `npm run e2e` runs the 48-step end-to-end test (onboarding → leads → students → booking → lessons → payments + webhook → reports → account deletion → multi-school isolation).
+3. Terminal 2: `npm run e2e` runs the 58-step end-to-end test (onboarding → leads → students → booking → lessons → payments + webhook → reports → reminders → account deletion → multi-school isolation). `npm run seed` instead fills a demo "Prince Driving School" (owner login 9000000001, OTP 123456).
 4. Optional: `npm run admin:emulator` opens the dashboard against the emulators; sign in with any phone number and the code shown on screen. After `npm run e2e`, the owner of the test school is `91<run id>000`, e.g. run `08129` → `9108129000`.
 
 ## Admin access

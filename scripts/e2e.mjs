@@ -80,7 +80,8 @@ function actor(name) {
   connectFirestoreEmulator(db, HOST, 8080);
   const fns = getFunctions(app, REGION);
   connectFunctionsEmulator(fns, HOST, 5001);
-  const call = async (fn, data) => (await httpsCallable(fns, fn)(data)).data;
+  // Generous timeout: on a low-memory machine the functions emulator can take well over the default 70s.
+  const call = async (fn, data) => (await httpsCallable(fns, fn, { timeout: 180_000 })(data)).data;
   return {
     name, app, auth, db, call,
     async login(phone10) {
