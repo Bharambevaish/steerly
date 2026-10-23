@@ -1,9 +1,9 @@
 import React from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ADMIN_URL } from '@/lib/config';
+import { openUrl } from '@/lib/device';
 import { useAuth } from '@/lib/auth';
 import { Button, Icon, Screen, Text, useTheme } from '@/ui';
 
@@ -16,8 +16,8 @@ export default function AdminWeb() {
       scroll={false}
       footer={
         <>
-          <Button title="Open admin dashboard" icon="external" onPress={() => WebBrowser.openBrowserAsync(ADMIN_URL).catch(() => {})} />
-          <Button title="Sign out" variant="ghost" icon="logout" onPress={() => signOut().then(() => router.replace('/'))} />
+          <Button title="Open admin dashboard" icon="external" onPress={() => openUrl(ADMIN_URL)} />
+          <Button title="Sign out" variant="ghost" icon="logout" onPress={() => signOut().catch(() => {}).then(() => router.replace('/'))} />
         </>
       }
     >
@@ -31,6 +31,9 @@ export default function AdminWeb() {
         </Text>
         <Text variant="bodyStrong" color={t.c.brand}>
           {ADMIN_URL.replace(/^https?:\/\//, '')}
+        </Text>
+        <Text variant="caption" faint>
+          Also give lessons? Ask the owner to turn on “Also teaches” for your account in the dashboard, then reopen this app to get your instructor schedule here.
         </Text>
       </View>
     </Screen>

@@ -5,9 +5,9 @@ import { useAuth } from '@/lib/auth';
 import { tabIcon, useTabScreenOptions } from '@/ui/tabs';
 
 export default function InstructorTabs() {
-  const { user, claims, initializing } = useAuth();
+  const { user, canTeach, initializing, teachesLoading } = useAuth();
   const options = useTabScreenOptions();
-  if (!initializing && (!user || claims.role !== 'instructor' || !claims.schoolId)) return <Redirect href="/" />;
+  if (!initializing && !teachesLoading && (!user || !canTeach)) return <Redirect href="/" />;
   return (
     <Tabs screenOptions={options}>
       <Tabs.Screen name="today" options={{ title: 'Today', tabBarIcon: tabIcon('zap') }} />

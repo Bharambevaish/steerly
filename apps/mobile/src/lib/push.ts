@@ -53,3 +53,10 @@ export function linkFromNotification(n: Notifications.Notification | null | unde
   const link = n?.request.content.data?.link;
   return typeof link === 'string' && link ? link : null;
 }
+
+/** The last notification the user tapped (default action only), as { id, link }. */
+export function useTappedNotification(): { id: string; link: string | null } | null {
+  const response = Notifications.useLastNotificationResponse();
+  if (!response || response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return null;
+  return { id: response.notification.request.identifier, link: linkFromNotification(response.notification) };
+}

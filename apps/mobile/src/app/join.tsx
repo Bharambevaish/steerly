@@ -47,7 +47,7 @@ export default function Join() {
       footer={
         <>
           <Button title="Join school" icon="arrowRight" loading={busy} onPress={submit} />
-          <Button title="Sign out" variant="ghost" onPress={() => signOut().then(() => router.replace('/'))} />
+          <Button title="Sign out" variant="ghost" onPress={() => signOut().catch(() => {}).then(() => router.replace('/'))} />
         </>
       }
     >

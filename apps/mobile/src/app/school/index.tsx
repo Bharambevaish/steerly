@@ -1,8 +1,9 @@
 import React from 'react';
-import { Linking, View } from 'react-native';
+import { View } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSchool } from '@/lib/school';
+import { callPhone } from '@/lib/device';
 import { useCourses } from '@/lib/data';
 import { formatINR, vehicleLabel } from '@/lib/format';
 import { APP_NAME } from '@/lib/config';
@@ -57,7 +58,7 @@ export default function SchoolHome() {
         <Row style={{ marginTop: 16 }}>
           <Button title="Enquire now" size="md" variant="secondary" full={false} icon="message" onPress={() => router.push('/school/enquire')} />
           {school?.phone ? (
-            <Button title="Call" size="md" variant="ghost" full={false} icon="phone" onPress={() => Linking.openURL(`tel:${school.phone}`).catch(() => {})} style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
+            <Button title="Call" size="md" variant="ghost" full={false} icon="phone" onPress={() => callPhone(school.phone)} style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
           ) : null}
         </Row>
       </Card>

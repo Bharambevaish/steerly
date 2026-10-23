@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
-import * as WebBrowser from 'expo-web-browser';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from './callables';
 import { useAuth } from './auth';
+import { openUrl } from './device';
 
 /** Create a Razorpay payment link for `amount` paise, open it, and refresh student/payments afterwards. */
 export function usePay() {
@@ -15,7 +15,7 @@ export function usePay() {
       setPaying(true);
       try {
         const { url } = await api.createPaymentLink({ schoolId: claims.schoolId, amount: Math.round(amount) });
-        await WebBrowser.openBrowserAsync(url);
+        await openUrl(url);
         // The webhook marks the payment as paid; listeners update live, this just nudges the cache.
         await Promise.all([
           qc.invalidateQueries({ queryKey: ['student'] }),
@@ -32,5 +32,5 @@ export function usePay() {
 
 export async function openReceipt(schoolId: string, paymentId: string) {
   const { url } = await api.getReceiptUrl({ schoolId, paymentId });
-  await WebBrowser.openBrowserAsync(url);
+  await openUrl(url);
 }

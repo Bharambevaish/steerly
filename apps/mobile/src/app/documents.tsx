@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as WebBrowser from 'expo-web-browser';
 import { collection, deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { studentDocumentsCol, studentFilePath, type DocumentType, type StudentDocument } from '@steerly/shared';
@@ -10,9 +9,10 @@ import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { useMyDocuments } from '@/lib/data';
 import { errorMessage } from '@/lib/callables';
+import { confirmAsync, openUrl } from '@/lib/device';
 import { fmtDate } from '@/lib/format';
 import type { WithId } from '@/lib/live';
-import { Badge, Button, Card, Chip, EmptyState, Icon, IconButton, Row, Screen, Sheet, SkeletonList, Text, useTheme, useToast } from '@/ui';
+import { Badge, Banner, Button, Card, Chip, EmptyState, Icon, IconButton, Row, Screen, Sheet, SkeletonList, Text, useTheme, useToast } from '@/ui';
 
 const TYPES: { id: DocumentType; label: string }[] = [
   { id: 'photo', label: 'Photo' },
@@ -80,10 +80,13 @@ export default function Documents() {
 
   const pickPhoto = async (camera: boolean) => {
     try {
-      const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        toast.error(camera ? 'Camera permission is needed to take a photo.' : 'Photo access is needed to pick a photo.');
-        return;
+      // The browser's file chooser needs no permission prompt.
+      if (Platform.OS !== 'web') {
+        const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          toast.error(camera ? 'Camera permission is needed to take a photo.' : 'Photo access is needed to pick a photo.');
+          return;
+        }
       }
       const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
       const res = camera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
@@ -110,36 +113,29 @@ export default function Documents() {
   const view = async (d: WithId<Partial<StudentDocument>>) => {
     if (!d.storagePath) return;
     try {
-      await WebBrowser.openBrowserAsync(await getDownloadURL(ref(storage, d.storagePath)));
+      await openUrl(await getDownloadURL(ref(storage, d.storagePath)));
     } catch (e) {
       toast.error(errorMessage(e, 'Couldn’t open that file.'));
     }
   };
 
-  const remove = (d: WithId<Partial<StudentDocument>>) => {
+  const remove = async (d: WithId<Partial<StudentDocument>>) => {
     if (!claims.schoolId || !claims.studentId) return;
     const schoolId = claims.schoolId;
     const studentId = claims.studentId;
-    Alert.alert('Delete document?', d.fileName ?? 'This file', [
-      { text: 'Keep', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            if (d.storagePath) await deleteObject(ref(storage, d.storagePath)).catch(() => {});
-            await deleteDoc(doc(db, studentDocumentsCol(schoolId, studentId), d.id));
-            toast.success('Deleted');
-          } catch (e) {
-            toast.error(e);
-          }
-        },
-      },
-    ]);
+    if (!(await confirmAsync('Delete document?', d.fileName ?? 'This file', 'Delete', true))) return;
+    try {
+      if (d.storagePath) await deleteObject(ref(storage, d.storagePath)).catch(() => {});
+      await deleteDoc(doc(db, studentDocumentsCol(schoolId, studentId), d.id));
+      toast.success('Deleted');
+    } catch (e) {
+      toast.error(e);
+    }
   };
 
   return (
     <Screen back title="Documents" onRefresh={() => docs.refetch()} footer={<Button title="Upload a document" icon="upload" onPress={() => setSheet(true)} />}>
+      {docs.error && !docs.data.length ? <Banner tone="danger" text="Couldn’t load this. Pull down to retry." /> : null}
       {docs.loading ? (
         <SkeletonList count={3} h={72} />
       ) : docs.data.length === 0 ? (
@@ -178,8 +174,8 @@ export default function Documents() {
         <Text variant="caption" faint>
           Photos or PDFs, up to 10 MB.
         </Text>
-        <Button title="Take a photo" icon="image" variant="secondary" loading={uploading} onPress={() => pickPhoto(true)} />
-        <Button title="Choose from gallery" icon="image" variant="secondary" disabled={uploading} onPress={() => pickPhoto(false)} />
+        {Platform.OS !== 'web' ? <Button title="Take a photo" icon="image" variant="secondary" loading={uploading} onPress={() => pickPhoto(true)} /> : null}
+        <Button title={Platform.OS === 'web' ? 'Choose a photo' : 'Choose from gallery'} icon="image" variant="secondary" loading={Platform.OS === 'web' && uploading} disabled={uploading} onPress={() => pickPhoto(false)} />
         <Button title="Choose a PDF / file" icon="file" variant="secondary" disabled={uploading} onPress={pickPdf} />
       </Sheet>
     </Screen>

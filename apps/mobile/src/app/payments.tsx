@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { useMyPayments, useMyStudent } from '@/lib/data';
 import { openReceipt, usePay } from '@/lib/payments';
 import { fmtDateTime, formatINR } from '@/lib/format';
-import { Badge, Button, Card, Chip, EmptyState, Icon, Input, ProgressBar, Row, Screen, Sheet, SkeletonList, Text, useTheme, useToast } from '@/ui';
+import { Badge, Banner, Button, Card, Chip, EmptyState, Icon, Input, ProgressBar, Row, Screen, Sheet, SkeletonList, Text, useTheme, useToast } from '@/ui';
 
 const METHOD: Record<string, string> = { razorpay: 'Online', cash: 'Cash', upi: 'UPI', bank_transfer: 'Bank transfer' };
 const STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
@@ -79,6 +79,7 @@ export default function Payments() {
       </Card>
 
       <Text variant="h3">History</Text>
+      {payments.error && !payments.data.length ? <Banner tone="danger" text="Couldn’t load this. Pull down to retry." /> : null}
       {payments.loading ? (
         <SkeletonList count={3} h={72} />
       ) : payments.data.length === 0 ? (

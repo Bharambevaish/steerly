@@ -6,8 +6,8 @@ import { useSchool } from '@/lib/school';
 import { useMyBookings } from '@/lib/data';
 import { api } from '@/lib/callables';
 import { fmtDate, fmtTime, toDate } from '@/lib/format';
-import type { WithId } from '@/lib/live';
-import { Badge, Button, Card, Chip, EmptyState, Icon, Input, Row, Screen, Sheet, SkeletonList, Text, haptic, useTheme, useToast } from '@/ui';
+import { useNow, type WithId } from '@/lib/live';
+import { Badge, Banner, Button, Card, Chip, EmptyState, Icon, Input, Row, Screen, Sheet, SkeletonList, Text, haptic, useTheme, useToast } from '@/ui';
 
 type B = WithId<Partial<Booking>>;
 const skillLabel = (id: string) => SKILLS.find((s) => s.id === id)?.label ?? id;
@@ -33,7 +33,7 @@ export default function Lessons() {
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const now = Date.now();
+  const now = useNow(60000);
   const { upcoming, past } = useMemo(() => {
     const up: B[] = [];
     const pa: B[] = [];
@@ -85,6 +85,7 @@ export default function Lessons() {
         <Chip label={`Past (${past.length})`} selected={tab === 'past'} onPress={() => setTab('past')} />
       </Row>
 
+      {bookings.error && !bookings.data.length ? <Banner tone="danger" text="Couldn’t load this. Pull down to retry." /> : null}
       {bookings.loading ? (
         <SkeletonList count={3} h={110} />
       ) : list.length === 0 ? (
@@ -97,7 +98,7 @@ export default function Lessons() {
         list.map((b) => {
           const st = STATUS[b.status ?? ''] ?? { label: b.status ?? '—', tone: 'neutral' as const };
           const start = toDate(b.start);
-          const canCancel = b.status === 'booked' && !!start && start.getTime() - Date.now() > (settings.cancelBeforeHours ?? 0) * 3600_000;
+          const canCancel = b.status === 'booked' && !!start && start.getTime() - now > (settings.cancelBeforeHours ?? 0) * 3600_000;
           return (
             <Card key={b.id} style={{ gap: 10 }}>
               <Row>

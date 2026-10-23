@@ -9,7 +9,7 @@ import { useInbox } from '@/lib/data';
 import { resolveLink } from '@/lib/links';
 import { fmtDateTime } from '@/lib/format';
 import type { WithId } from '@/lib/live';
-import { Card, EmptyState, Icon, IconButton, Row, Screen, SkeletonList, Text, useTheme, type IconName } from '@/ui';
+import { Banner, Card, EmptyState, Icon, IconButton, Row, Screen, SkeletonList, Text, useTheme, type IconName } from '@/ui';
 
 const ICON: Record<string, IconName> = {
   lesson_reminder: 'clock',
@@ -23,17 +23,18 @@ const ICON: Record<string, IconName> = {
 export default function Notifications() {
   const t = useTheme();
   const router = useRouter();
-  const { user, role } = useAuth();
+  const { user, role, canTeach } = useAuth();
   const inbox = useInbox();
 
   const open = async (n: WithId<Partial<InboxNotification>>) => {
     if (!user) return;
     if (!n.read) updateDoc(doc(db, inboxCol(user.uid), n.id), { read: true }).catch(() => {});
-    if (n.link) router.push(resolveLink(n.link, role));
+    if (n.link) router.push(resolveLink(n.link, role, canTeach));
   };
 
   return (
     <Screen back title="Notifications" onRefresh={() => inbox.refetch()}>
+      {inbox.error && !inbox.data.length ? <Banner tone="danger" text="Couldn’t load this. Pull down to retry." /> : null}
       {inbox.loading ? (
         <SkeletonList count={4} h={76} />
       ) : inbox.data.length === 0 ? (

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { onIdTokenChanged, signInWithCustomToken, signOut as fbSignOut, type User } from 'firebase/auth';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { COLLECTIONS, type Role, type SteerlyClaims, type UserDoc } from '@steerly/shared';
+import { COLLECTIONS, schoolCol, type Member, type Role, type SteerlyClaims, type UserDoc } from '@steerly/shared';
 import { auth, db } from './firebase';
 
 interface AuthState {
@@ -11,6 +11,12 @@ interface AuthState {
   profile: Partial<UserDoc> | null;
   initializing: boolean;
   role: Role | null;
+  /** Owner/staff who also give lessons (members/{uid}.teaches). Always true for instructors. */
+  teaches: boolean;
+  /** True while we still need members/{uid} to decide `teaches` (owner/staff only). */
+  teachesLoading: boolean;
+  /** Can use the instructor tabs: instructors, plus owners/staff with teaches === true. */
+  canTeach: boolean;
   signInWithToken: (token: string) => Promise<SteerlyClaims>;
   /** Force-refresh the ID token so new custom claims (after joinSchool etc.) are visible. */
   refreshClaims: () => Promise<SteerlyClaims>;
@@ -32,6 +38,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [claims, setClaims] = useState<SteerlyClaims>({});
   const [profile, setProfile] = useState<Partial<UserDoc> | null>(null);
   const [initializing, setInitializing] = useState(true);
+  // members/{uid}.teaches for owner/staff, tagged with the member path it was read from.
+  const [member, setMember] = useState<{ key: string; teaches: boolean } | null>(null);
 
   useEffect(
     () =>
@@ -65,6 +73,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }, [user]);
 
+  const needsMember = !!user && !!claims.schoolId && (claims.role === 'owner' || claims.role === 'staff');
+  const memberKey = needsMember && user && claims.schoolId ? `${schoolCol(claims.schoolId, 'members')}/${user.uid}` : null;
+  useEffect(() => {
+    if (!memberKey) return;
+    return onSnapshot(
+      doc(db, memberKey),
+      (snap) => setMember({ key: memberKey, teaches: snap.exists() && (snap.data() as Partial<Member>).teaches === true }),
+      () => setMember({ key: memberKey, teaches: false }),
+    );
+  }, [memberKey]);
+  const memberTeaches = memberKey && member?.key === memberKey ? member.teaches : undefined;
+
   const refreshClaims = useCallback(async () => {
     const u = auth.currentUser;
     if (!u) return {};
@@ -92,9 +112,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await fbSignOut(auth);
   }, []);
 
+  const teaches = claims.role === 'instructor' || memberTeaches === true;
+  const teachesLoading = !!memberKey && memberTeaches === undefined;
   const value = useMemo<AuthState>(
-    () => ({ user, claims, profile, initializing, role: claims.role ?? null, signInWithToken, refreshClaims, signOut }),
-    [user, claims, profile, initializing, signInWithToken, refreshClaims, signOut],
+    () => ({
+      user,
+      claims,
+      profile,
+      initializing,
+      role: claims.role ?? null,
+      teaches,
+      teachesLoading,
+      canTeach: teaches && !!claims.schoolId,
+      signInWithToken,
+      refreshClaims,
+      signOut,
+    }),
+    [user, claims, profile, initializing, teaches, teachesLoading, signInWithToken, refreshClaims, signOut],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

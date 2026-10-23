@@ -18,4 +18,5 @@ export const APP_VERSION: string = Constants.expoConfig?.version ?? '0.0.0';
 /** Where owners/staff manage their school. */
 export const ADMIN_URL: string = process.env.EXPO_PUBLIC_ADMIN_URL || 'https://admin.steerly.app';
 
-export const DEFAULT_BRAND = '#F59E0B';
+/** Build-time brand (APP_BRAND_COLOR) until the school's own brandColor loads. */
+export const DEFAULT_BRAND: string = (Constants.expoConfig?.extra as { brandColor?: string } | undefined)?.brandColor || '#F59E0B';

@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Linking, View } from 'react-native';
+import { View } from 'react-native';
 import { addDays } from 'date-fns';
 import { SKILLS, type Booking, type SkillId, type SkillLevel } from '@steerly/shared';
 import { useAuth } from '@/lib/auth';
+import { callPhone } from '@/lib/device';
 import { useInstructorBookings, useStudent } from '@/lib/data';
 import { useNow, type WithId } from '@/lib/live';
 import { api } from '@/lib/callables';
@@ -10,6 +11,7 @@ import { countdown, firstName, fmtDateLong, fmtTime, greeting, startOfSchoolDay,
 import {
   Avatar,
   Badge,
+  Banner,
   Button,
   Card,
   Chip,
@@ -73,6 +75,7 @@ export default function Today() {
         </Row>
       </Card>
 
+      {bookings.error && !bookings.data.length ? <Banner tone="danger" text="Couldn’t load this. Pull down to retry." /> : null}
       {bookings.loading ? (
         <SkeletonList count={4} h={96} />
       ) : bookings.data.length === 0 ? (
@@ -118,7 +121,7 @@ function LessonCard({ b, now, onComplete }: { b: B; now: number; onComplete: () 
           <Badge label={badge.label} tone={badge.tone} />
         </View>
         {b.studentPhone ? (
-          <IconButton icon="phone" label={`Call ${b.studentName ?? 'student'}`} bg={t.c.brandSoft} color={t.c.brand} onPress={() => Linking.openURL(`tel:+91${b.studentPhone}`).catch(() => {})} />
+          <IconButton icon="phone" label={`Call ${b.studentName ?? 'student'}`} bg={t.c.brandSoft} color={t.c.brand} onPress={() => callPhone(b.studentPhone)} />
         ) : null}
       </Row>
       {b.status === 'booked' && now >= start - 30 * 60000 ? (

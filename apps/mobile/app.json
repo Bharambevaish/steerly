@@ -14,7 +14,7 @@
     "android": {
       "package": "app.steerly.student",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -52,7 +52,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can upload your documents and profile photo.",
-          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera so you can photograph your documents."
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera so you can photograph your documents.",
+          "microphonePermission": false
         }
       ]
     ],

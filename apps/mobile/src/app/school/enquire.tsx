@@ -10,11 +10,12 @@ import { db } from '@/lib/firebase';
 import { useSchool } from '@/lib/school';
 import { useCourses } from '@/lib/data';
 import { errorMessage } from '@/lib/callables';
-import { Button, Chip, Input, Row, Screen, Text, useToast } from '@/ui';
+import { Button, Chip, Input, Row, Screen, Text, useTheme, useToast } from '@/ui';
 
 type FormIn = z.input<typeof enquiryInputSchema>;
 
 export default function Enquire() {
+  const t = useTheme();
   const router = useRouter();
   const toast = useToast();
   const params = useLocalSearchParams<{ courseId?: string }>();
@@ -118,7 +119,7 @@ export default function Enquire() {
           ))}
         </Row>
         {formState.errors.courseName ? (
-          <Text variant="caption" color="#DC2626">
+          <Text variant="caption" color={t.c.danger}>
             {formState.errors.courseName.message}
           </Text>
         ) : null}
@@ -133,7 +134,7 @@ export default function Enquire() {
           ))}
         </Row>
         {formState.errors.preferredTime ? (
-          <Text variant="caption" color="#DC2626">
+          <Text variant="caption" color={t.c.danger}>
             {formState.errors.preferredTime.message}
           </Text>
         ) : null}

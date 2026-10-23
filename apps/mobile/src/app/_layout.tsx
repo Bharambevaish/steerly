@@ -3,7 +3,6 @@ import { View } from 'react-native';
 import { Stack, useRouter, ThemeProvider as NavThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import * as Notifications from 'expo-notifications';
 import { useFonts } from 'expo-font';
 import { SpaceGrotesk_600SemiBold } from '@expo-google-fonts/space-grotesk/600SemiBold';
 import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk/700Bold';
@@ -16,7 +15,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { SchoolProvider, useSchool } from '@/lib/school';
 import { useOnline } from '@/lib/network';
-import { registerForPush, linkFromNotification } from '@/lib/push';
+import { registerForPush, useTappedNotification } from '@/lib/push';
 import { resolveLink } from '@/lib/links';
 import { Banner, ThemeProvider, ToastProvider, useTheme } from '@/ui';
 
@@ -73,8 +72,8 @@ function AppStack() {
   const t = useTheme();
   const online = useOnline();
   const insets = useSafeAreaInsets();
-  const { user, role } = useAuth();
-  usePush(user?.uid ?? null, role);
+  const { user, role, canTeach } = useAuth();
+  usePush(user?.uid ?? null, role, canTeach);
 
   const navTheme = t.dark ? DarkTheme : DefaultTheme;
   return (
@@ -97,23 +96,24 @@ function AppStack() {
 }
 
 /** Register the device for push after login and route notification taps by data.link. */
-function usePush(uid: string | null, role: ReturnType<typeof useAuth>['role']) {
+function usePush(uid: string | null, role: ReturnType<typeof useAuth>['role'], canTeach: boolean) {
   const router = useRouter();
-  const response = Notifications.useLastNotificationResponse();
+  const tapped = useTappedNotification();
+  const tapId = tapped?.id ?? null;
+  const tapLink = tapped?.link ?? null;
   const handled = useRef<string | null>(null);
 
   useEffect(() => {
-    if (uid) registerForPush(uid);
+    if (uid) registerForPush(uid).catch(() => {});
   }, [uid]);
 
   useEffect(() => {
-    if (!uid || !role || !response) return;
-    if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
-    const id = response.notification.request.identifier;
-    if (handled.current === id) return;
-    handled.current = id;
+    if (!uid || !role || !tapId || handled.current === tapId) return;
     // Let the index redirect settle before pushing on top of it.
-    const timer = setTimeout(() => router.push(resolveLink(linkFromNotification(response.notification), role)), 300);
+    const timer = setTimeout(() => {
+      handled.current = tapId;
+      router.push(resolveLink(tapLink, role, canTeach));
+    }, 300);
     return () => clearTimeout(timer);
-  }, [uid, role, response, router]);
+  }, [uid, role, canTeach, tapId, tapLink, router]);
 }

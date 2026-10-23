@@ -1,8 +1,9 @@
 import React from 'react';
-import { Linking, View } from 'react-native';
+import { View } from 'react-native';
 import { skillProgress } from '@steerly/shared';
 import { useMyAssignedStudents } from '@/lib/data';
-import { Avatar, Badge, Card, EmptyState, IconButton, ProgressBar, Row, Screen, SkeletonList, Text, useTheme } from '@/ui';
+import { callPhone } from '@/lib/device';
+import { Avatar, Badge, Banner, Card, EmptyState, IconButton, ProgressBar, Row, Screen, SkeletonList, Text, useTheme } from '@/ui';
 
 export default function Students() {
   const t = useTheme();
@@ -12,6 +13,7 @@ export default function Students() {
 
   return (
     <Screen title="My students" subtitle={`${active.length} active`} onRefresh={() => students.refetch()}>
+      {students.error && !students.data.length ? <Banner tone="danger" text="Couldn’t load this. Pull down to retry." /> : null}
       {students.loading ? (
         <SkeletonList count={4} h={96} />
       ) : students.data.length === 0 ? (
@@ -35,7 +37,7 @@ export default function Students() {
                 </View>
                 {s.status && s.status !== 'active' ? <Badge label={s.status === 'completed' ? 'Completed' : 'Dropped'} /> : null}
                 {s.phone ? (
-                  <IconButton icon="phone" label={`Call ${s.name ?? 'student'}`} bg={t.c.brandSoft} color={t.c.brand} onPress={() => Linking.openURL(`tel:+91${s.phone}`).catch(() => {})} />
+                  <IconButton icon="phone" label={`Call ${s.name ?? 'student'}`} bg={t.c.brandSoft} color={t.c.brand} onPress={() => callPhone(s.phone)} />
                 ) : null}
               </Row>
               <Row gap={16}>

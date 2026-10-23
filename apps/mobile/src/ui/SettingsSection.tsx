@@ -36,7 +36,7 @@ export function SettingsSection() {
         />
         <ListRow icon="bell" title="Notifications" subtitle="Reminders, payments and updates" onPress={() => router.push('/notifications')} />
         <ListRow icon="trash" title="Delete account" subtitle="Remove your login and personal data" danger onPress={() => router.push('/delete-account')} />
-        <ListRow icon="logout" title="Sign out" onPress={() => signOut().then(() => router.replace('/'))} />
+        <ListRow icon="logout" title="Sign out" onPress={() => signOut().catch(() => {}).then(() => router.replace('/'))} />
       </Card>
       <Text variant="caption" faint center>
         {APP_NAME} v{APP_VERSION}

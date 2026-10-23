@@ -9,7 +9,7 @@ import { useInstructorSlots } from '@/lib/data';
 import { errorMessage } from '@/lib/callables';
 import { dayKey, fmt, fmtTime, schoolDays, toDate } from '@/lib/format';
 import type { WithId } from '@/lib/live';
-import { Card, EmptyState, IconButton, Row, Screen, SkeletonList, Text, haptic, useTheme, useToast } from '@/ui';
+import { Banner, Card, EmptyState, IconButton, Row, Screen, SkeletonList, Text, haptic, useTheme, useToast } from '@/ui';
 
 type S = WithId<Partial<Slot>>;
 
@@ -92,6 +92,7 @@ export default function Schedule() {
         Tap an open slot to block it (e.g. for a break), tap again to reopen.
       </Text>
 
+      {slots.error && !slots.data.length ? <Banner tone="danger" text="Couldn’t load this. Pull down to retry." /> : null}
       {slots.loading ? (
         <SkeletonList count={4} h={90} />
       ) : slots.data.length === 0 ? (
