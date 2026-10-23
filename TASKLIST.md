@@ -3,7 +3,7 @@
 ~~Struck through~~ = done. Plain text = still to do.
 Full steps for your tasks are in [USER_TODO.md](USER_TODO.md) (same IDs). Claude updates this file as work finishes.
 
-_Last updated: 2026-10-24_
+_Last updated: 2026-10-24 (all Claude tasks done; everything left needs your accounts or decisions)_
 
 ---
 
@@ -40,8 +40,8 @@ _Last updated: 2026-10-24_
 - ~~Fix: 19 backend files were never committed (bad ignore rule)~~
 - ~~Admin lint: 19 warnings → 0~~
 - ~~Make the scheduled reminder jobs testable, and test them~~
-- Test the mobile app (browser version) against the emulators with demo data
-- Add emulator mode to the website and test a school's public page with demo data
+- ~~Test the mobile app (browser version) against the emulators with demo data~~ — found and fixed a crash on start; student (home, book, lessons) and instructor (today, schedule, students) screens all work
+- ~~Add emulator mode to the website and test a school's public page with demo data~~ — courses load, enquiry form saves a valid lead
 
 ### Extra features
 - ~~Owners/staff who also teach can be instructors (admin, mobile, backend)~~
@@ -76,6 +76,8 @@ Most were servers Claude stopped on purpose once their checks were done; the rei
 - ~~Website preview server (bq9l38fe8)~~ (built site served, HTTP 200)
 - ~~Reinstall to hoist expo-router to root~~ (all four packages at top level, one React)
 - ~~End-to-end test now waits up to 3 min per call, so it also passes on a low-memory laptop~~
+
+> Note: three newer "Failed" entries ("Serve mobile web build on port 8082", "Run website in emulator mode", "Run emulators for mobile web testing") are test servers Claude shut down on purpose after the browser tests above passed. They are not errors.
 
 ---
 

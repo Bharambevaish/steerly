@@ -17,7 +17,10 @@ npm run admin:emulator     # terminal 2 — dashboard at http://localhost:5173
 ```
 
 Log in on the dashboard with phone **9000000001**, OTP **123456** (owner). Instructors: 9000000002 / 9000000003 (OTP 123456, mobile app).
-Mobile in the browser: copy `apps/mobile/.env.emulator.example` to `apps/mobile/.env.local`, then `cd apps/mobile && npx expo start --web`.
+Public school page: `npm run web:emulator`, then open http://localhost:5174/s/prince-driving-school
+Mobile app in the browser: copy `apps/mobile/.env.emulator.example` to `apps/mobile/.env.local` (back up your real one first), then `cd apps/mobile && npx expo start --web`. Student login 9000000011, instructor 9000000002, OTP 123456.
+
+Tip: your laptop has 7.8 GB RAM. Close other heavy apps (IDEs, Python checker, MySQL) before running all of this at once.
 
 ---
 
