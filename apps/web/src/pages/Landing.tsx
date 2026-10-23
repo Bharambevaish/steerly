@@ -1,4 +1,4 @@
-import { formatINR, PLANS, TRIAL_DAYS, type PlanId } from '@steerly/shared';
+import { formatINR, PLANS, TRIAL_DAYS, type PlanId } from '@steerly/shared/lite';
 import {
   ArrowRight,
   CalendarCheck,

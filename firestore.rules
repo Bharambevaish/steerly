@@ -67,8 +67,8 @@ service cloud.firestore {
 
       match /members/{uid} {
         allow read: if isStaffOrInstructor(schoolId);
-        // Owners can edit a member's display name/phone; role & active go through updateMember.
-        allow update: if isOwner(schoolId) && onlyChanges(['name', 'phone', 'email']);
+        // Owners can edit a member's display name/phone and "also teaches"; role & active go through updateMember.
+        allow update: if isOwner(schoolId) && onlyChanges(['name', 'phone', 'email', 'teaches']);
       }
 
       match /invites/{phone} {

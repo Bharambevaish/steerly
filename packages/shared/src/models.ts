@@ -95,6 +95,8 @@ export interface Member {
   email: string | null;
   role: Exclude<Role, 'student' | 'superAdmin'>;
   active: boolean;
+  /** Owners/staff who also give lessons. Instructors always teach; missing means false. */
+  teaches?: boolean;
   createdAt: FsTimestamp;
 }
 

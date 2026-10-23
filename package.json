@@ -21,7 +21,12 @@
     "admin:emulator": "npm run dev:emulator -w steerly-admin"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "expo-router": "^57.0.28",
     "firebase-admin": "^14.5.0",
     "firebase-tools": "^15.34.0"
+  },
+  "overrides": {
+    "react-server-dom-webpack": "19.2.3"
   }
 }

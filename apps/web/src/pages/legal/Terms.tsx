@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { PLANS, TRIAL_DAYS, formatINR } from '@steerly/shared';
+import { PLANS, TRIAL_DAYS, formatINR } from '@steerly/shared/lite';
 import { COMPANY, COMPANY_ADDRESS, LegalLayout, SUPPORT_EMAIL } from './LegalLayout';
 
 export default function Terms() {

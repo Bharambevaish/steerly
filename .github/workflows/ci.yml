@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'build/**', 'phase-**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, unit tests, builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test -w steerly-functions
+      - run: npm run build:functions
+      - name: Build admin
+        run: npm run build -w steerly-admin
+        env:
+          VITE_FIREBASE_API_KEY: ci
+          VITE_FIREBASE_PROJECT_ID: ci
+      - name: Build website
+        run: npm run build -w steerly-web
+      - name: Bundle mobile app (Android)
+        working-directory: apps/mobile
+        run: npx expo export --platform android --output-dir ${{ runner.temp }}/mobile-export
+        env:
+          EXPO_PUBLIC_FIREBASE_API_KEY: ci
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ci
+
+  e2e:
+    name: End-to-end on Firebase emulators
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - name: Emulator env (dev values only)
+        run: |
+          printf 'OTP_DEV_MODE=true\nRAZORPAY_KEY_ID=rzp_test_dummy\nPUBLIC_WEB_URL=http://localhost:5174\nWHATSAPP_ENABLED=false\n' > functions/.env.local
+          printf 'MSG91_AUTH_KEY=dev\nRAZORPAY_KEY_SECRET=dev\nRAZORPAY_WEBHOOK_SECRET=e2e-webhook-secret\nAISENSY_API_KEY=dev\n' > functions/.secret.local
+      - run: npm run build:functions
+      - name: Run e2e against emulators
+        run: npx firebase emulators:exec --project demo-steerly --only auth,functions,firestore,storage "node scripts/e2e.mjs"
+        env:
+          FUNCTIONS_DISCOVERY_TIMEOUT: 60

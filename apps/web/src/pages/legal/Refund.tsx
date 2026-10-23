@@ -1,4 +1,4 @@
-import { TRIAL_DAYS } from '@steerly/shared';
+import { TRIAL_DAYS } from '@steerly/shared/lite';
 import { LegalLayout, SUPPORT_EMAIL } from './LegalLayout';
 
 export default function Refund() {
