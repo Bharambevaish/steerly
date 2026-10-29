@@ -21,7 +21,8 @@
     "admin:emulator": "npm run dev:emulator -w steerly-admin",
     "brand": "node scripts/brand/generate.mjs",
     "seed": "node scripts/seed.mjs",
-    "web:emulator": "npm run dev:emulator -w steerly-web"
+    "web:emulator": "npm run dev:emulator -w steerly-web",
+    "create-school": "node scripts/create-school.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

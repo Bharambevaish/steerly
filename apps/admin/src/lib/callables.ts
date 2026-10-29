@@ -60,7 +60,14 @@ interface Callables {
 export type CallableName = keyof Callables & keyof typeof FN;
 
 /** Typed wrapper: `await call('bookSlot', { schoolId, slotId, studentId })`. */
+/** False on the free Firebase (Spark) plan, where Cloud Functions can't be deployed. */
+export const FUNCTIONS_ENABLED = import.meta.env.VITE_FUNCTIONS_ENABLED !== 'false';
+
+export const FUNCTIONS_DISABLED_MESSAGE =
+  'This feature needs Cloud Functions, which require the Firebase Blaze plan. See docs/FIREBASE_FREE_SETUP.md.';
+
 export async function call<K extends CallableName>(name: K, input: Callables[K][0]): Promise<Callables[K][1]> {
+  if (!FUNCTIONS_ENABLED) throw new FirebaseError('functions/failed-precondition', FUNCTIONS_DISABLED_MESSAGE);
   const fn = httpsCallable<Callables[K][0], Callables[K][1]>(functions, FN[name]);
   const res = await fn(input);
   return res.data;
@@ -78,6 +85,8 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong. Ple
       case 'functions/unavailable':
       case 'unavailable':
         return 'Network problem. Check your connection and try again.';
+      case 'functions/failed-precondition':
+        return err.message || 'That action is not possible right now.';
       case 'functions/not-found':
         return err.message || 'Not found.';
       case 'functions/internal':

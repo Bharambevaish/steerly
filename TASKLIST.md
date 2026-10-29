@@ -58,6 +58,16 @@ _Last updated: 2026-10-24 (all Claude tasks done; everything left needs your acc
 - ~~Offline banner with expo-network~~
 - ~~Install expo-dev-client~~
 
+### Free Firebase plan support (2026-10-29)
+- ~~Check what the free (Spark) plan includes on Firebase's own pages~~
+- ~~Step-by-step free-plan guide: docs/FIREBASE_FREE_SETUP.md~~
+- ~~`npm run create-school`: create a school + owner login without Cloud Functions~~
+- ~~Free-plan switch (`VITE_FUNCTIONS_ENABLED` / `EXPO_PUBLIC_FUNCTIONS_ENABLED`): clear messages instead of errors~~
+- ~~Tested with only Auth + Firestore emulators: school creation, email login, dashboard, adding leads, friendly Blaze message~~
+- ~~Commit author set to Vaishnavi Bharambe on all commits~~
+- ~~Old Firebase web key removed from git history before pushing~~
+- Push to GitHub (waiting for your answer: the repo is public)
+
 ### Brand
 - ~~Steerly logo (steering wheel "S")~~
 - ~~App icon, Android icon layers, splash, favicons~~

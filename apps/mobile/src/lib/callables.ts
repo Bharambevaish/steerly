@@ -21,9 +21,19 @@ import {
 } from '@steerly/shared';
 import { functions } from './firebase';
 
+/** False on the free Firebase (Spark) plan, where Cloud Functions can't be deployed. */
+export const FUNCTIONS_ENABLED = process.env.EXPO_PUBLIC_FUNCTIONS_ENABLED !== 'false';
+
 function callable<I, O>(name: string) {
   const fn = httpsCallable<I, O>(functions, name);
-  return async (input: I): Promise<O> => (await fn(input)).data;
+  return async (input: I): Promise<O> => {
+    if (!FUNCTIONS_ENABLED) {
+      throw Object.assign(new Error('Login and booking are not switched on for this school yet. Please contact the school directly.'), {
+        code: 'functions/failed-precondition',
+      });
+    }
+    return (await fn(input)).data;
+  };
 }
 
 export const api = {

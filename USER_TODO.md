@@ -24,13 +24,16 @@ Tip: your laptop has 7.8 GB RAM. Close other heavy apps (IDEs, Python checker, M
 
 ---
 
+## ★ Using the free Firebase plan first?
+Follow **[docs/FIREBASE_FREE_SETUP.md](docs/FIREBASE_FREE_SETUP.md)**: no card needed. It replaces A3–A5, B1–B2, B5, B7 and B8a below for now. Without Blaze, logins, booking and payments stay off. Do the rest of section B when you upgrade.
+
 ## A. Accounts to create (one-time)
 
 | # | Task | Why | Status |
 |---|---|---|---|
-| A1 | Create a **private GitHub repo** named `steerly` and push this folder (`git remote add origin …` then `git push -u origin --all`) | Backup + history | ⬜ |
+| A1 | GitHub repo created: `Bharambevaish/steerly` (Claude pushes once you confirm public/private) | Backup + history | ⬜ |
 | A2 | Buy the domain (e.g. `steerly.app` or `steerly.in`). Check it's free on a registrar and search the name on the [trademark site](https://ipindiaonline.gov.in/eregister/) | Brand + website | ⬜ |
-| A3 | Create Firebase projects **`steerly-dev`** and **`steerly-prod`** (console.firebase.google.com). Upgrade both to the **Blaze** (pay-as-you-go) plan. Cloud Functions need it; the free tier still applies | Backend | ⬜ |
+| A3 | Create Firebase projects **`steerly-dev`** and **`steerly-prod`** (console.firebase.google.com). On the free plan, create only `steerly-dev` (see the free-plan guide). Upgrade to **Blaze** later for logins, booking and payments; the free allowance still applies | Backend | ⬜ |
 | A4 | In each project: **Firestore** (location `asia-south1` Mumbai), **Storage**, **Authentication → Email/Password** on | Backend | ⬜ |
 | A5 | Register a **Web app** in each project and copy the config into `apps/admin/.env.local`, `apps/mobile/.env.local` and `apps/web/.env.local` (templates are the `.env.example` files) | Connect apps | ⬜ |
 | A6 | **Razorpay** account (business KYC). Get Test keys first, Live keys after KYC | Payments | ⬜ |
