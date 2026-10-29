@@ -31,7 +31,7 @@ Follow **[docs/FIREBASE_FREE_SETUP.md](docs/FIREBASE_FREE_SETUP.md)**: no card n
 
 | # | Task | Why | Status |
 |---|---|---|---|
-| A1 | GitHub repo created: `Bharambevaish/steerly` (Claude pushes once you confirm public/private) | Backup + history | ⬜ |
+| A1 | ~~GitHub repo + push~~ — done: https://github.com/Bharambevaish/steerly (public). The automatic GitHub checks run on every push | ✅ |
 | A2 | Buy the domain (e.g. `steerly.app` or `steerly.in`). Check it's free on a registrar and search the name on the [trademark site](https://ipindiaonline.gov.in/eregister/) | Brand + website | ⬜ |
 | A3 | Create Firebase projects **`steerly-dev`** and **`steerly-prod`** (console.firebase.google.com). On the free plan, create only `steerly-dev` (see the free-plan guide). Upgrade to **Blaze** later for logins, booking and payments; the free allowance still applies | Backend | ⬜ |
 | A4 | In each project: **Firestore** (location `asia-south1` Mumbai), **Storage**, **Authentication → Email/Password** on | Backend | ⬜ |

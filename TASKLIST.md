@@ -66,7 +66,7 @@ _Last updated: 2026-10-24 (all Claude tasks done; everything left needs your acc
 - ~~Tested with only Auth + Firestore emulators: school creation, email login, dashboard, adding leads, friendly Blaze message~~
 - ~~Commit author set to Vaishnavi Bharambe on all commits~~
 - ~~Old Firebase web key removed from git history before pushing~~
-- Push to GitHub (waiting for your answer: the repo is public)
+- ~~Push to GitHub: https://github.com/Bharambevaish/steerly (main + 2 branches)~~
 
 ### Brand
 - ~~Steerly logo (steering wheel "S")~~
@@ -94,7 +94,7 @@ Most were servers Claude stopped on purpose once their checks were done; the rei
 ## 2. Your tasks (need your accounts, money or decisions)
 
 ### A. Accounts
-- A1 Private GitHub repo + push the code
+- ~~A1 GitHub repo + push the code (public: github.com/Bharambevaish/steerly)~~
 - A2 Buy a domain and check the trademark
 - A3 Firebase projects `steerly-dev` and `steerly-prod` (Blaze plan)
 - A4 Turn on Firestore, Storage and Email/Password sign-in
