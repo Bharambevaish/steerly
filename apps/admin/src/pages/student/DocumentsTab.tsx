@@ -67,6 +67,7 @@ export default function DocumentsTab({ student }: StudentTabProps) {
 
   const view = async (d: StudentDocument) => {
     const win = window.open('', '_blank');
+    if (win) win.opener = null; // no link back to the dashboard (reverse tabnabbing)
     try {
       const url = await getDownloadURL(storageRef(storage, d.storagePath));
       if (win) win.location.href = url;

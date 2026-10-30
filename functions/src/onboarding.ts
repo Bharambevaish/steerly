@@ -1,3 +1,4 @@
+import { maskPhone, securityEvent } from './lib/securityLog';
 import { Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
@@ -207,6 +208,10 @@ export const inviteMember = callable(inviteMemberSchema, async (data, request): 
     if (user.schoolId && user.schoolId !== data.schoolId) {
       throw new HttpsError('already-exists', 'This person already belongs to another school.');
     }
+  }
+  // Only someone already in THIS school (e.g. a deactivated member) is re-added instantly. Anyone else,
+  // including an existing user with no school, gets an invite they accept by signing in (consent).
+  if (user && user.schoolId === data.schoolId) {
     if (user.role === 'student') {
       throw new HttpsError('failed-precondition', 'This number is registered as a student. Use a different number for staff.');
     }
@@ -223,11 +228,13 @@ export const inviteMember = callable(inviteMemberSchema, async (data, request): 
     };
     await subDoc(data.schoolId, 'members', user.uid).set(member);
     await setClaims(user.uid, { role: data.role, schoolId: data.schoolId });
+    securityEvent('member_invited', { schoolId: data.schoolId, by: caller.uid, uid: user.uid, role: data.role, mode: 'reactivated' });
     return { ok: true };
   }
 
   const invite: Invite = { phone: e164, name: data.name, role: data.role, invitedBy: caller.uid, createdAt: Timestamp.now() };
   await subDoc(data.schoolId, 'invites', e164).set(invite);
+  securityEvent('member_invited', { schoolId: data.schoolId, by: caller.uid, phone: maskPhone(e164), role: data.role, mode: 'invite' });
   return { ok: true };
 });
 
@@ -260,5 +267,6 @@ export const updateMember = callable(updateMemberSchema, async (data, request): 
     await setClaims(data.uid, {});
     await auth.revokeRefreshTokens(data.uid);
   }
+  securityEvent('member_updated', { schoolId: data.schoolId, by: caller.uid, uid: data.uid, role, active });
   return { ok: true };
 });

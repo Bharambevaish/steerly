@@ -447,6 +447,53 @@ await step('a school owner cannot use another school\'s data', async () => {
   await expectFail(other.call('createStudent', { schoolId: ctx.schoolId, courseId: ctx.course.id, name: 'Xavier', phone: phone(0) }), 'permission-denied');
 });
 
+// ---------- Security hardening (docs/SECURITY_REVIEW.md) ----------
+console.log('Security');
+const extraPhone = (suffix) => `8${run}${suffix}`; // 10 digits, unused by the steps above
+await step('M1: public enquiries named like a spreadsheet formula are rejected', async () => {
+  for (const name of ['=HYPERLINK("http://evil.example","x")', '+cmd|/c calc', '@SUM(1)', '-2+3']) {
+    await expectFail(addDoc(collection(visitor.db, S('enquiries')), enquiry({ name, phone: extraPhone('1111') })), 'permission-denied');
+  }
+});
+await step('M3: owner cannot set an invalid brand colour, logo URL, name or settings', async () => {
+  const sref = doc(owner.db, `schools/${ctx.schoolId}`);
+  await expectFail(updateDoc(sref, { brandColor: 'red; background:url(https://evil.example)' }), 'permission-denied');
+  await expectFail(updateDoc(sref, { logoUrl: 'javascript:alert(1)' }), 'permission-denied');
+  await expectFail(updateDoc(sref, { logoUrl: 'https://evil.example/pixel.png' }), 'permission-denied');
+  await expectFail(updateDoc(sref, { name: 'x'.repeat(500) }), 'permission-denied');
+  await expectFail(updateDoc(sref, { 'settings.maxBookingsPerDay': 9999 }), 'permission-denied');
+  await expectFail(updateDoc(sref, { 'settings.evil': true }), 'permission-denied');
+  // Valid edits still work.
+  await updateDoc(sref, { brandColor: '#0EA5E9', logoUrl: null, 'settings.maxBookingsPerDay': 2 });
+  await updateDoc(sref, { 'settings.maxBookingsPerDay': 1 });
+});
+await step("L2: a student cannot attach a document record to another student's folder or as SVG", async () => {
+  const col = collection(student.db, `${S('students')}/${ctx.studentId}/documents`);
+  const base = {
+    type: 'id_proof', fileName: 'aadhaar.pdf', contentType: 'application/pdf', verified: false,
+    uploadedBy: student.auth.currentUser.uid, uploadedAt: serverTimestamp(),
+  };
+  await expectFail(addDoc(col, { ...base, storagePath: `schools/${ctx.schoolId}/students/${ctx.student2Id}/x-aadhaar.pdf` }), 'permission-denied');
+  await expectFail(addDoc(col, { ...base, contentType: 'image/svg+xml', storagePath: `schools/${ctx.schoolId}/students/${ctx.studentId}/x.svg` }), 'permission-denied');
+  await expectFail(addDoc(col, { ...base, type: 'anything', storagePath: `schools/${ctx.schoolId}/students/${ctx.studentId}/x.pdf` }), 'permission-denied');
+  await addDoc(col, { ...base, storagePath: `schools/${ctx.schoolId}/students/${ctx.studentId}/d1-aadhaar.pdf` });
+});
+await step('L1: inviting an existing user who has no school sends an invite instead of adding them', async () => {
+  const loner = actor('loner');
+  const lonerPhone = extraPhone('2222');
+  const before = await loner.login(lonerPhone);
+  assert(!before.role && !before.schoolId, 'loner starts with no school');
+  await owner.call('inviteMember', { schoolId: ctx.schoolId, phone: lonerPhone, name: 'Lone Ranger', role: 'staff' });
+  const after = await loner.claims();
+  assert(!after.role && !after.schoolId, `loner must NOT be auto-added, got ${JSON.stringify(after)}`);
+  assert((await adb.doc(`${S('invites')}/+91${lonerPhone}`).get()).exists, 'an invite was created');
+  assert(!(await adb.doc(`${S('members')}/${loner.auth.currentUser.uid}`).get()).exists, 'no membership yet');
+});
+await step('L5: admins cannot save formula names or oversized notes on leads', async () => {
+  await expectFail(addDoc(collection(owner.db, S('enquiries')), enquiry({ name: 'Big Notes', phone: extraPhone('3333'), source: 'phone', notes: 'x'.repeat(2001) })), 'permission-denied');
+  await expectFail(addDoc(collection(owner.db, S('enquiries')), enquiry({ name: '=1+1', phone: extraPhone('3334'), source: 'phone' })), 'permission-denied');
+});
+
 // ---------- 11. Member rename + "also teaches" ----------
 console.log('Team (rename, also teaches)');
 const istYmd = (ms) => new Date(ms + 5.5 * 3600e3).toISOString().slice(0, 10);

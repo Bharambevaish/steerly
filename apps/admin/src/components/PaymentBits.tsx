@@ -21,6 +21,7 @@ export function ReceiptButton({ payment }: { payment: Payment }) {
   const open = async () => {
     // Open the tab synchronously so popup blockers allow it, then point it at the signed URL.
     const win = window.open('', '_blank');
+    if (win) win.opener = null; // no link back to the dashboard (reverse tabnabbing)
     setBusy(true);
     try {
       const { url } = await call('getReceiptUrl', { schoolId, paymentId: payment.id });

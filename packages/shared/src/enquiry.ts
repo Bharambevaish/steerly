@@ -21,7 +21,13 @@ export const phoneSchema = z
 
 // What the public enquiry form is allowed to submit. Mirrors validNewEnquiry() in firestore.rules.
 export const enquiryInputSchema = z.object({
-  name: z.string().trim().min(1, 'Please enter your full name.').max(80, 'Name is too long.'),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Please enter your full name.')
+    .max(80, 'Name is too long.')
+    // Spreadsheet formula characters (CSV injection, see docs/SECURITY_REVIEW.md M1). Mirrors safeText() in firestore.rules.
+    .refine((v) => !/^[=+@\t\r-]/.test(v), 'Name cannot start with = + - or @.'),
   phone: phoneSchema,
   courseId: z.string().max(64).nullable().default(null),
   courseName: z.string().trim().min(1, 'Please select a preferred course.').max(80),

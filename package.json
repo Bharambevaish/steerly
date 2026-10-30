@@ -31,6 +31,7 @@
     "firebase-tools": "^15.34.0"
   },
   "overrides": {
-    "react-server-dom-webpack": "19.2.3"
+    "react-server-dom-webpack": "19.2.3",
+    "@grpc/grpc-js": "^1.14.7"
   }
 }

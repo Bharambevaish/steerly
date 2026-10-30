@@ -1,3 +1,4 @@
+import { securityEvent } from './lib/securityLog';
 import { randomUUID } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onRequest } from 'firebase-functions/v2/https';
@@ -292,7 +293,7 @@ export const razorpayWebhook = onRequest({ secrets: [RAZORPAY_WEBHOOK_SECRET, AI
   }
   const signature = req.get('x-razorpay-signature');
   if (!verifyRazorpaySignature(req.rawBody, signature, RAZORPAY_WEBHOOK_SECRET.value())) {
-    logger.warn('Razorpay webhook: bad signature');
+    securityEvent('webhook_bad_signature', { hasSignature: Boolean(signature) });
     res.status(400).send('Invalid signature');
     return;
   }

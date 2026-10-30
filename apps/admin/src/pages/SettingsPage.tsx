@@ -290,6 +290,7 @@ function BillingSection({ school, readOnly }: { school: School; readOnly: boolea
 
   const choose = async (plan: PlanId) => {
     const win = window.open('', '_blank');
+    if (win) win.opener = null; // no link back to the dashboard (reverse tabnabbing)
     setBusy(plan);
     try {
       const { url } = await call('startSubscription', { schoolId, plan });

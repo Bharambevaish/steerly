@@ -1,0 +1,29 @@
+# Weekly dependency + GitHub Actions update PRs (OWASP A03 Supply Chain, see docs/SECURITY_REVIEW.md M4).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    groups:
+      # Expo packages must move together (npx expo install), so group them in one PR.
+      expo:
+        patterns: ['expo', 'expo-*', '@expo/*', 'react-native', 'react-native-*']
+      firebase:
+        patterns: ['firebase', 'firebase-*', '@firebase/*']
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+    ignore:
+      # React is pinned to the version Expo SDK 57 supports; upgrade together with Expo.
+      - dependency-name: react
+      - dependency-name: react-dom
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Kolkata

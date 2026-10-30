@@ -68,3 +68,21 @@ export function parseTestNumbers(raw: string): Set<string> {
       .filter((s) => s.length === 10),
   );
 }
+
+/** Fixed one-hour window counter (used per client IP). */
+export interface WindowCounter {
+  windowStartMs: number;
+  count: number;
+}
+
+/** Returns the counter after one more hit, or null when `max` hits already happened this hour. */
+export function bumpHourlyCounter(prev: WindowCounter | null, max: number, nowMs: number): WindowCounter | null {
+  if (!prev || prev.windowStartMs + HOUR_MS <= nowMs) return { windowStartMs: nowMs, count: 1 };
+  if (prev.count >= max) return null;
+  return { windowStartMs: prev.windowStartMs, count: prev.count + 1 };
+}
+
+/** Salted hash so raw client IPs are never stored. */
+export function hashIp(ip: string, salt: string): string {
+  return createHash('sha256').update(`${salt}:${ip}`).digest('hex').slice(0, 32);
+}

@@ -68,6 +68,11 @@ Follow **[docs/FIREBASE_FREE_SETUP.md](docs/FIREBASE_FREE_SETUP.md)**: no card n
 | B11 | Push notifications: `npx eas credentials` → Android → upload the **FCM v1** service-account key (iOS later: APNs). Test push on a development build: `npx eas build -p android --profile development` (doesn't work in Expo Go) | ⬜ |
 | B12 | White-label app for a school (e.g. Prince): build with `EXPO_PUBLIC_SCHOOL_ID=<schoolId>`, `EXPO_PUBLIC_APP_NAME="Prince Driving School"`, `APP_BUNDLE_ID=app.steerly.prince` and its own icon | ⬜ |
 
+| B13 | **Security alerts** (Google Cloud console → Logging → Log-based alerts), both emailing you: (1) filter `jsonPayload.security_event="otp_daily_cap_reached"`; (2) filter `jsonPayload.security_event="permission_denied"` with a threshold of more than 20 in 5 minutes. Details: `docs/SECURITY_REVIEW.md` M5 | ⬜ |
+| B14 | Firebase console → Authentication → Settings: **Password policy** at least 10 characters with mixed types, *Enforce*; keep **Email enumeration protection** on | ⬜ |
+| B15 | When the web dashboard has a reCAPTCHA key (B8): set `ENFORCE_APP_CHECK=true` in `functions/.env.<project>` and turn on App Check enforcement for Firestore. Read `docs/SECURITY_REVIEW.md` H2 first (mobile login needs a native App Check provider) | ⬜ |
+| B16 | Never set `OTP_DEV_MODE=true` for a real project (it's ignored now, but keep `.env.<project>` clean). Keep `OTP_TEST_NUMBERS` to numbers you own with no real data | ⬜ |
+
 ## C. Before going live
 
 | # | Task | Status |

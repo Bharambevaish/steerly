@@ -2,6 +2,8 @@ import { HttpsError, onCall, type CallableOptions, type CallableRequest } from '
 import { logger } from 'firebase-functions/v2';
 import type { z } from 'zod';
 import { ROLES, type Role, type SteerlyClaims } from '@steerly/shared';
+import { ENFORCE_APP_CHECK } from './params';
+import { securityEvent } from './securityLog';
 
 export interface Caller {
   uid: string;
@@ -47,6 +49,7 @@ export function assertRole(request: CallableRequest<unknown>, schoolId: string, 
   const caller = requireAuth(request);
   if (caller.isSuperAdmin) return caller;
   if (caller.claims.schoolId !== schoolId || !caller.role || !roles.includes(caller.role)) {
+    securityEvent('permission_denied', { uid: caller.uid, role: caller.role, callerSchoolId: caller.claims.schoolId ?? null, schoolId, needed: roles });
     throw new HttpsError('permission-denied', "You don't have permission to do that.");
   }
   return caller;
@@ -61,7 +64,8 @@ export function callable<S extends z.ZodType, O>(
   handler: (data: z.output<S>, request: CallableRequest<unknown>) => Promise<O>,
   opts: CallableOptions = {},
 ) {
-  return onCall<unknown, Promise<O>>(opts, async (request) => {
+  // App Check is enforced on every callable once ENFORCE_APP_CHECK=true (default off: see docs/SECURITY_REVIEW.md H2).
+  return onCall<unknown, Promise<O>>({ enforceAppCheck: ENFORCE_APP_CHECK, ...opts }, async (request) => {
     const data = parse(schema, request.data);
     try {
       return await handler(data, request);

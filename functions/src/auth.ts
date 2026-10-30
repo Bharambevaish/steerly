@@ -18,8 +18,11 @@ import { setClaims } from './lib/claims';
 import { as, schoolIdOf, subDoc, userRef } from './lib/data';
 import { callable } from './lib/guard';
 import {
+  bumpHourlyCounter,
   checkOtp,
   generateOtp,
+  hashIp,
+  type WindowCounter,
   generateSalt,
   nextOtpState,
   OTP_MAX_ATTEMPTS,
@@ -28,10 +31,26 @@ import {
   TEST_OTP,
   type OtpState,
 } from './lib/otp';
-import { MSG91_AUTH_KEY, MSG91_TEMPLATE_ID, OTP_DEV_MODE, OTP_TEST_NUMBERS } from './lib/params';
+import { MSG91_AUTH_KEY, MSG91_TEMPLATE_ID, OTP_DAILY_CAP, OTP_DEV_MODE, OTP_MAX_PER_IP_HOUR, OTP_TEST_NUMBERS } from './lib/params';
+import { maskPhone, securityEvent } from './lib/securityLog';
+import { istDate } from './lib/time';
 
 const otpRef = (e164: string) => db.collection('otpRequests').doc(e164);
-const isDevMode = () => OTP_DEV_MODE.value() === 'true';
+const inEmulator = () => process.env.FUNCTIONS_EMULATOR === 'true';
+/** Dev mode (OTP returned in the response) is honoured ONLY in the emulator, never on a live project. */
+const isDevMode = () => {
+  if (OTP_DEV_MODE.value() !== 'true') return false;
+  if (inEmulator()) return true;
+  securityEvent('otp_dev_mode_ignored', { project: process.env.GCLOUD_PROJECT ?? null });
+  return false;
+};
+const ipLimitRef = (ipHash: string) => db.collection('otpIpLimits').doc(ipHash);
+const dailyCounterRef = (day: string) => db.collection('otpDailyCounters').doc(day);
+
+/** Best-effort client IP (Cloud Functions sets req.ip from the load balancer). Never stored raw. */
+function clientIp(rawRequest: { ip?: string; headers?: Record<string, unknown> } | undefined): string {
+  return rawRequest?.ip || 'unknown';
+}
 const isTestNumber = (phone10: string) => parseTestNumbers(OTP_TEST_NUMBERS.value()).has(phone10);
 
 async function sendSms(e164: string, code: string): Promise<void> {
@@ -56,20 +75,41 @@ async function sendSms(e164: string, code: string): Promise<void> {
 
 export const requestOtp = callable(
   requestOtpSchema,
-  async ({ phone }): Promise<RequestOtpOutput> => {
+  async ({ phone }, request): Promise<RequestOtpOutput> => {
     const devMode = isDevMode();
     if (isTestNumber(phone)) return devMode ? { sent: true, devCode: TEST_OTP } : { sent: true };
 
     const e164 = toE164(phone);
     const code = generateOtp();
     const now = Date.now();
+    // Abuse limits only matter when a real SMS is sent (not in the emulator's dev mode).
+    const ipHash = hashIp(clientIp(request.rawRequest), `steerly-otp:${process.env.GCLOUD_PROJECT ?? ''}`);
+    const day = istDate(now);
     await db.runTransaction(async (tx) => {
       const prev = as<OtpState>(await tx.get(otpRef(e164)));
+      const ipPrev = devMode ? null : as<WindowCounter>(await tx.get(ipLimitRef(ipHash)));
+      const daily = devMode ? null : as<{ count: number }>(await tx.get(dailyCounterRef(day)));
+
       const wait = resendWaitMs(prev, now);
       if (wait > 0) {
+        securityEvent('otp_rate_limited_phone', { phone: maskPhone(e164) });
         const secs = Math.ceil(wait / 1000);
         const human = secs > 90 ? `${Math.ceil(secs / 60)} minutes` : `${secs} seconds`;
         throw new HttpsError('resource-exhausted', `Please wait ${human} before requesting another OTP.`);
+      }
+      if (!devMode) {
+        const ipNext = bumpHourlyCounter(ipPrev, OTP_MAX_PER_IP_HOUR.value(), now);
+        if (!ipNext) {
+          securityEvent('otp_rate_limited_ip', { ipHash, phone: maskPhone(e164) });
+          throw new HttpsError('resource-exhausted', 'Too many OTP requests from your network. Please try again in an hour.');
+        }
+        const sentToday = daily?.count ?? 0;
+        if (sentToday >= OTP_DAILY_CAP.value()) {
+          securityEvent('otp_daily_cap_reached', { day, cap: OTP_DAILY_CAP.value() });
+          throw new HttpsError('resource-exhausted', "We can't send more OTPs right now. Please try again later.");
+        }
+        tx.set(ipLimitRef(ipHash), { ...ipNext, ttl: Timestamp.fromMillis(now + 2 * 3600_000) });
+        tx.set(dailyCounterRef(day), { count: sentToday + 1, ttl: Timestamp.fromMillis(now + 3 * 86_400_000) });
       }
       const state = nextOtpState(prev, e164, code, generateSalt(), now);
       // `ttl` lets a Firestore TTL policy clean these up.
@@ -100,8 +140,10 @@ async function consumeOtp(e164: string, code: string): Promise<void> {
     case 'expired':
       throw new HttpsError('deadline-exceeded', 'This OTP has expired. Please request a new one.');
     case 'locked':
+      securityEvent('otp_locked', { phone: maskPhone(e164) });
       throw new HttpsError('resource-exhausted', 'Too many wrong attempts. Please request a new OTP.');
     case 'wrong':
+      securityEvent('otp_wrong', { phone: maskPhone(e164), attemptsLeft: result.attemptsLeft });
       throw new HttpsError(
         'invalid-argument',
         result.attemptsLeft > 0 ? `Incorrect OTP. ${result.attemptsLeft} attempt(s) left.` : 'Incorrect OTP. Please request a new one.',

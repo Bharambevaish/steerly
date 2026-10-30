@@ -68,6 +68,19 @@ _Last updated: 2026-10-24 (all Claude tasks done; everything left needs your acc
 - ~~Old Firebase web key removed from git history before pushing~~
 - ~~Push to GitHub: https://github.com/Bharambevaish/steerly (main + 2 branches)~~
 
+### Security review — OWASP Top 10 2025 (2026-10-30)
+- ~~Review website, dashboard, functions, rules, headers, dependencies: docs/SECURITY_REVIEW.md~~
+- ~~H1 OTP dev mode can no longer leak codes on a live project~~
+- ~~H2 SMS pumping: per-IP limit + daily cap + optional App Check enforcement~~
+- ~~M1 CSV formula injection neutralised (export + form + rules)~~
+- ~~M2 Security headers (CSP, clickjacking, HSTS, nosniff, referrer, permissions)~~
+- ~~M3 School profile/settings validated in rules~~
+- ~~M4 Vulnerable dependencies patched (10 → 3 high, rest is Expo tooling) + Dependabot~~
+- ~~M5 Security event logging~~
+- ~~L1–L5 invite consent, document paths, no SVG uploads, tabnabbing, lead field limits~~
+- ~~Re-tested: 39 unit tests, 63/63 end-to-end, headers checked in a browser~~
+- Upgrade to Expo SDK 58 (clears the last 3 high advisories in build tools)
+
 ### Brand
 - ~~Steerly logo (steering wheel "S")~~
 - ~~App icon, Android icon layers, splash, favicons~~
@@ -106,6 +119,10 @@ Most were servers Claude stopped on purpose once their checks were done; the rei
 - A10 Apple developer account (only for iOS)
 
 ### B. Setup
+- B13 Security alerts in Cloud Logging
+- B14 Auth password policy + email enumeration protection
+- B15 App Check enforcement (after B8)
+- B16 Keep OTP dev mode off / test numbers minimal
 - B1 `firebase login` (the CLI itself is already installed in the project: `npx firebase`)
 - B2 Point `.firebaserc` at `steerly-dev`
 - B3 Set the 4 secrets

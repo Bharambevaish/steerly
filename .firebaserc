@@ -1,5 +1,17 @@
 {
   "projects": {
     "default": "prince-driving-school"
+  },
+  "targets": {
+    "demo-steerly": {
+      "hosting": {
+        "admin": [
+          "demo-steerly-admin"
+        ],
+        "web": [
+          "demo-steerly-web"
+        ]
+      }
+    }
   }
 }

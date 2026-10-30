@@ -91,8 +91,11 @@ export const PUBLIC_SITE_URL = (import.meta.env.VITE_PUBLIC_SITE_URL || 'https:/
 
 export function downloadCsv(fileName: string, rows: (string | number | null | undefined)[][]): void {
   const esc = (v: string | number | null | undefined) => {
-    const s = v == null ? '' : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    let s = v == null ? '' : String(v);
+    // CSV/formula injection: Excel and Sheets run cells starting with = + - @ (or tab/CR) as formulas.
+    // Lead names come from the public form, so neutralise text cells with a leading apostrophe.
+    if (typeof v === 'string' && /^[=+@\t\r-]/.test(s)) s = `'${s}`;
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const csv = '﻿' + rows.map((r) => r.map(esc).join(',')).join('\n');
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));

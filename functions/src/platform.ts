@@ -1,3 +1,4 @@
+import { securityEvent } from './lib/securityLog';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions/v2';
 import {
@@ -50,5 +51,6 @@ export const setSchoolStatus = callable(setSchoolStatusSchema, async (data, requ
   if (!caller.isSuperAdmin) throw new HttpsError('permission-denied', 'Only Steerly administrators can change a school status.');
   await getSchool(data.schoolId);
   await schoolRef(data.schoolId).update({ 'subscription.status': data.status });
+  securityEvent('school_status_changed', { schoolId: data.schoolId, by: caller.uid, status: data.status });
   return { ok: true };
 });

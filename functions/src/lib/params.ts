@@ -1,4 +1,4 @@
-import { defineSecret, defineString } from 'firebase-functions/params';
+import { defineBoolean, defineInt, defineSecret, defineString } from 'firebase-functions/params';
 
 // Secrets (Secret Manager): firebase functions:secrets:set <NAME>. Emulator: functions/.secret.local
 export const MSG91_AUTH_KEY = defineSecret('MSG91_AUTH_KEY');
@@ -20,3 +20,11 @@ export const WHATSAPP_CAMPAIGN_LESSON_REMINDER = defineString('WHATSAPP_CAMPAIGN
 export const WHATSAPP_CAMPAIGN_PAYMENT_LINK = defineString('WHATSAPP_CAMPAIGN_PAYMENT_LINK', { default: '' });
 export const WHATSAPP_CAMPAIGN_RECEIPT = defineString('WHATSAPP_CAMPAIGN_RECEIPT', { default: '' });
 export const PUBLIC_WEB_URL = defineString('PUBLIC_WEB_URL', { default: 'https://steerly.app' });
+
+// Abuse protection. ENFORCE_APP_CHECK rejects callable requests without a valid App Check token
+// (turn on only when every client sends one; see docs/SECURITY_REVIEW.md H2).
+export const ENFORCE_APP_CHECK = defineBoolean('ENFORCE_APP_CHECK', { default: false });
+/** Max OTP SMS per hour from one client IP (best effort; IPs can be shared or spoofed). */
+export const OTP_MAX_PER_IP_HOUR = defineInt('OTP_MAX_PER_IP_HOUR', { default: 20 });
+/** Hard platform-wide cap on OTP SMS per day (IST). Protects the SMS bill from pumping attacks. */
+export const OTP_DAILY_CAP = defineInt('OTP_DAILY_CAP', { default: 1000 });

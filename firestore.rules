@@ -63,7 +63,8 @@ service cloud.firestore {
       allow list: if isSuperAdmin();
       // Owners edit the profile and settings; plan/status/code/owner are function-only.
       allow update: if isOwner(schoolId)
-        && onlyChanges(['name', 'logoUrl', 'brandColor', 'phone', 'email', 'address', 'city', 'settings']);
+        && onlyChanges(['name', 'logoUrl', 'brandColor', 'phone', 'email', 'address', 'city', 'settings'])
+        && validSchoolProfile(request.resource.data);
 
       match /members/{uid} {
         allow read: if isStaffOrInstructor(schoolId);
@@ -94,7 +95,8 @@ service cloud.firestore {
         allow read: if isAdmin(schoolId);
         allow update: if isAdmin(schoolId)
           && onlyChanges(['status', 'notes', 'followUpAt', 'updatedAt', 'courseId', 'courseName', 'preferredTime'])
-          && request.resource.data.status in ['New', 'Contacted', 'Enrolled', 'Lost'];
+          && request.resource.data.status in ['New', 'Contacted', 'Enrolled', 'Lost']
+          && validLeadDetails(request.resource.data);
         allow delete: if isOwner(schoolId);
       }
 
@@ -115,8 +117,11 @@ service cloud.firestore {
             || (isStudent(schoolId) && myStudentId() == studentId);
           allow create: if (isAdmin(schoolId) || (isStudent(schoolId) && myStudentId() == studentId))
             && request.resource.data.verified == false
-            && request.resource.data.uploadedBy == request.auth.uid;
-          allow update: if isAdmin(schoolId) && onlyChanges(['verified', 'type']);
+            && request.resource.data.uploadedBy == request.auth.uid
+            && validStudentDocument(request.resource.data, schoolId, studentId);
+          allow update: if isAdmin(schoolId) && onlyChanges(['verified', 'type'])
+            && request.resource.data.type in DOCUMENT_TYPES()
+            && request.resource.data.verified is bool;
           allow delete: if isAdmin(schoolId)
             || (isStudent(schoolId) && myStudentId() == studentId && resource.data.verified == false);
         }
@@ -161,6 +166,7 @@ service cloud.firestore {
       return d.keys().hasOnly(['name', 'phone', 'courseId', 'courseName', 'preferredTime', 'source',
                                'status', 'notes', 'followUpAt', 'studentId', 'createdAt', 'updatedAt'])
         && d.name is string && d.name.size() > 0 && d.name.size() <= 80
+        && safeText(d.name)
         && d.phone is string && d.phone.matches('^[6-9][0-9]{9}$')
         && (d.courseId == null || (d.courseId is string && d.courseId.size() <= 64))
         && d.courseName is string && d.courseName.size() > 0 && d.courseName.size() <= 80
@@ -183,7 +189,62 @@ service cloud.firestore {
         && d.source in ['app', 'web', 'walk_in', 'phone', 'referral']
         && d.status in ['New', 'Contacted', 'Lost']
         && d.get('studentId', null) == null
+        && validLeadDetails(d)
         && d.createdAt == request.time;
+    }
+
+    // Text that a spreadsheet would treat as a formula when exported to CSV (see SECURITY_REVIEW M1).
+    function safeText(t) {
+      return !t.matches('^[=+@\t\r-].*');
+    }
+
+    function validLeadDetails(d) {
+      return d.name is string && d.name.size() > 0 && d.name.size() <= 80 && safeText(d.name)
+        && d.preferredTime in ['Morning', 'Afternoon', 'Evening', 'Flexible']
+        && (d.get('courseName', '') is string && d.get('courseName', '').size() <= 80)
+        && (d.get('courseId', null) == null || (d.courseId is string && d.courseId.size() <= 64))
+        && (d.get('notes', '') is string && d.get('notes', '').size() <= 2000)
+        && (d.get('followUpAt', null) == null || d.followUpAt is timestamp);
+    }
+
+    function DOCUMENT_TYPES() {
+      return ['photo', 'id_proof', 'address_proof', 'medical', 'learner_licence', 'driving_licence', 'other'];
+    }
+
+    // A document record may only point at that student's own Storage folder.
+    function validStudentDocument(d, schoolId, studentId) {
+      return d.type in DOCUMENT_TYPES()
+        && d.fileName is string && d.fileName.size() > 0 && d.fileName.size() <= 200
+        && d.contentType in ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf']
+        && d.storagePath is string && d.storagePath.size() <= 400
+        && d.storagePath.matches('^schools/' + schoolId + '/students/' + studentId + '/[^/]+$');
+    }
+
+    // Owner-editable school profile + settings (see SECURITY_REVIEW M3). Ranges match the Settings page.
+    function validSchoolProfile(d) {
+      return d.name is string && d.name.size() >= 2 && d.name.size() <= 80
+        && d.brandColor is string && d.brandColor.matches('^#[0-9A-Fa-f]{6}$')
+        && (d.logoUrl == null
+            || (d.logoUrl is string && d.logoUrl.size() <= 1000
+                && d.logoUrl.matches('^(https://firebasestorage[.]googleapis[.]com/|http://(127[.]0[.]0[.]1|localhost):9199/).*')))
+        && d.phone is string && d.phone.matches('^[0-9]{10}$')
+        && (d.email == null || (d.email is string && d.email.size() <= 120))
+        && d.address is string && d.address.size() <= 300
+        && d.city is string && d.city.size() <= 60
+        && validSettings(d.settings);
+    }
+
+    function validSettings(st) {
+      return st.keys().hasOnly(['lessonMinutes', 'cancelBeforeHours', 'maxBookingsPerDay', 'bookingWindowDays',
+                                'gstin', 'gstPercent', 'upiId', 'receiptPrefix'])
+        && st.lessonMinutes is number && st.lessonMinutes >= 15 && st.lessonMinutes <= 240
+        && st.cancelBeforeHours is number && st.cancelBeforeHours >= 0 && st.cancelBeforeHours <= 168
+        && st.maxBookingsPerDay is number && st.maxBookingsPerDay >= 1 && st.maxBookingsPerDay <= 10
+        && st.bookingWindowDays is number && st.bookingWindowDays >= 1 && st.bookingWindowDays <= 90
+        && (st.gstin == null || (st.gstin is string && st.gstin.size() <= 20))
+        && st.gstPercent in [0, 18]
+        && (st.upiId == null || (st.upiId is string && st.upiId.size() <= 80))
+        && st.receiptPrefix is string && st.receiptPrefix.matches('^[A-Z0-9]{2,6}$');
     }
 
     // Everything else is closed.

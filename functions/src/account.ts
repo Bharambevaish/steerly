@@ -1,3 +1,4 @@
+import { securityEvent } from './lib/securityLog';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions/v2';
 import { deleteMyAccountSchema, studentDocumentsCol, type OkOutput, type StudentDocument } from '@steerly/shared';
@@ -37,5 +38,6 @@ export const deleteMyAccount = callable(deleteMyAccountSchema, async (_data, req
   await db.recursiveDelete(userRef(caller.uid));
   if (caller.phone) await db.collection('otpRequests').doc(caller.phone).delete();
   await auth.deleteUser(caller.uid);
+  securityEvent('account_deleted', { uid: caller.uid, role: caller.role, schoolId: caller.claims.schoolId ?? null });
   return { ok: true };
 });
