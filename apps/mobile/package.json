@@ -33,7 +33,7 @@
     "expo-network": "~57.0.3",
     "expo-notifications": "~57.0.23",
     "expo-router": "~57.0.28",
-    "expo-splash-screen": "~57.0.10",
+    "expo-splash-screen": "~58.0.11",
     "expo-status-bar": "~57.0.1",
     "expo-web-browser": "~57.0.3",
     "firebase": "^12.19.0",
