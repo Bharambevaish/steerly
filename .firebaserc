@@ -1,6 +1,7 @@
 {
   "projects": {
-    "default": "prince-driving-school"
+    "default": "steerly-dev-d74dd",
+    "old-prince": "prince-driving-school"
   },
   "targets": {
     "demo-steerly": {

@@ -7,10 +7,9 @@ Status: ⬜ to do · ✅ done
 
 ## ★ Start here: see the whole product on your laptop (no accounts needed)
 
-Needs Java 21 (already installed by Claude at `%LOCALAPPDATA%\Programs\jdk21`). In PowerShell:
+Needs Java 21. It's already installed, and `npm run emulators` finds it by itself. In PowerShell:
 
 ```powershell
-$env:JAVA_HOME="$env:LOCALAPPDATA\Programs\jdk21\jdk-21.0.12.1+1"; $env:PATH="$env:JAVA_HOME\bin;$env:PATH"; $env:FUNCTIONS_DISCOVERY_TIMEOUT=60
 npm run emulators          # terminal 1 — leave running
 npm run seed               # terminal 2 — creates a demo "Prince Driving School"
 npm run admin:emulator     # terminal 2 — dashboard at http://localhost:5173

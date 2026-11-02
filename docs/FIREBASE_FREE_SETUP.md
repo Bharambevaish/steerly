@@ -2,6 +2,22 @@
 
 This guide sets up a real Firebase project **without a credit card**. Checked against Firebase's pricing pages on 29 Oct 2026.
 
+> ### Your progress: project `steerly-dev-d74dd` (updated 2 Nov 2026)
+> | Step | Status |
+> |---|---|
+> | 1 Create project | ✅ done (`steerly-dev`, ID `steerly-dev-d74dd`, Spark plan) |
+> | 2 Register web app | ✅ done |
+> | 3 Email/Password sign-in | ✅ done |
+> | 4 Firestore database | ✅ done. Double-check the location under Firestore → Settings: it should be **asia-south1** |
+> | 5 Config in the apps | ✅ done: Claude converted your pasted config into the three `.env.local` files |
+> | 6 CLI connected | ⏳ `.firebaserc` already points at `steerly-dev-d74dd`, so just run `npx firebase login` |
+> | 7 Deploy rules | ⏳ **next**: `npx firebase deploy --only firestore` |
+> | 8 Create school + owner | ⏳ `npm run create-school …` |
+> | 9 Run it | ⏳ `npm run admin` (**not** `admin:emulator`) |
+> | 10–11 Hosting, lock old project | ⏳ |
+>
+> See **Troubleshooting** at the end of section 2 for the errors you hit and what caused them.
+
 ## 1. What works for free and what doesn't
 
 The free **Spark** plan includes **Firestore, Authentication and Hosting**.
@@ -62,6 +78,18 @@ Do this once. It takes about 30 minutes. All commands run in PowerShell from the
 ### Step 5 — Put the config into the apps
 Copy each example file, then fill in the 6 values from Step 2.
 
+> ⚠ **Don't paste the JavaScript snippet Firebase shows you** (`import { initializeApp } …`, `const firebaseConfig = { apiKey: "…" }`) into `.env.local`. These files take one `NAME=value` per line, with no quotes, commas or code. Convert each line like this:
+>
+> | In Firebase's snippet | Line in `appsdmin\.env.local` / `apps\web\.env.local` | Line in `apps\mobile\.env.local` |
+> |---|---|---|
+> | `apiKey: "AIza…"` | `VITE_FIREBASE_API_KEY=AIza…` | `EXPO_PUBLIC_FIREBASE_API_KEY=AIza…` |
+> | `authDomain: "x.firebaseapp.com"` | `VITE_FIREBASE_AUTH_DOMAIN=x.firebaseapp.com` | `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=…` |
+> | `projectId: "x"` | `VITE_FIREBASE_PROJECT_ID=x` | `EXPO_PUBLIC_FIREBASE_PROJECT_ID=…` |
+> | `storageBucket: "x.firebasestorage.app"` | `VITE_FIREBASE_STORAGE_BUCKET=…` | `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=…` |
+> | `messagingSenderId: "123"` | `VITE_FIREBASE_MESSAGING_SENDER_ID=123` | `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123` |
+> | `appId: "1:123:web:abc"` | `VITE_FIREBASE_APP_ID=1:123:web:abc` | `EXPO_PUBLIC_FIREBASE_APP_ID=…` |
+> | `measurementId: "G-…"` | not needed: Steerly doesn't use Google Analytics | not needed |
+
 ```powershell
 Copy-Item apps\admin\.env.example apps\admin\.env.local -Force
 Copy-Item apps\web\.env.example apps\web\.env.local -Force
@@ -101,9 +129,9 @@ EXPO_PUBLIC_SCHOOL_ID=
 The CLI is already installed inside the project, so you run it with `npx firebase`.
 ```powershell
 npx firebase login                 # opens the browser; sign in with the same Google account
-npx firebase use --add             # pick your new project, then type the alias: default
+npx firebase use                   # should print: Active Project: default (steerly-dev-d74dd)
 ```
-This updates `.firebaserc` so it points at your project instead of `prince-driving-school`.
+`.firebaserc` already points `default` at `steerly-dev-d74dd`, and the old project is kept under the alias `old-prince` for Step 11. If you ever create another project, run `npx firebase use --add` and pick it.
 
 ### Step 7 — Deploy the security rules and indexes
 ```powershell
@@ -128,12 +156,27 @@ You should see `Deploy complete!`. Don't deploy `functions` or `storage`: both n
    Skip this if you want to stay a normal school owner. A super admin's school is chosen from the Platform page instead.
 
 ### Step 9 — Run it
+First stop any dashboard that's already running (click its terminal, press **Ctrl + C**). Then:
 ```powershell
 npm run admin      # dashboard → http://localhost:5173 → Email tab → sign in
 npm run web        # website  → http://localhost:5174/s/<your-school-slug>
 npm run mobile     # app → scan the QR code with Expo Go on your phone
 ```
-Try it: submit an enquiry on the website or the app → it appears live in **Leads** on the dashboard.
+- Use **`npm run admin`** for your real project. `npm run admin:emulator` is only for the offline demo (section 2b below) and talks to `127.0.0.1`, not Firebase.
+- On the free plan, sign in on the **Email** tab with the owner created in Step 8. **Don't use "Start your free trial" / Sign up**: creating a school from the website needs Cloud Functions (Blaze). Step 8's script does the same job for free.
+- Try it: submit an enquiry on the website or the app → it appears live in **Leads** on the dashboard.
+
+### Troubleshooting (errors seen on 2 Nov 2026)
+| What you see | Cause | Fix |
+|---|---|---|
+| Sign-up/login shows `auth/network-request-failed`; console shows `127.0.0.1:9099 … ERR_CONNECTION_REFUSED` | The dashboard was started with `npm run admin:emulator` (demo mode), but the emulators weren't running | For your real project: stop it and run `npm run admin`. For the offline demo: start `npm run emulators` first (section 2b) |
+| Phone OTP shows "Server error" and `127.0.0.1:5001/…/requestOtp ERR_CONNECTION_REFUSED` | Same as above (demo mode without emulators) | Same as above. On the real free project, phone OTP shows a "needs the Blaze plan" message instead, as designed |
+| `npm run emulators`: "firebase-tools no longer supports Java version before 21" | That terminal used the default Java 20 | Fixed: `npm run emulators` now finds Java 21 by itself (it was installed in `%LOCALAPPDATA%\Programs\jdk21`). Just run it again |
+| `npm run seed`: "Firestore emulator not reachable at 127.0.0.1:8080" | Seed needs the emulators running | Run `npm run emulators` in one terminal, wait for "All emulators ready", then `npm run seed` in a second terminal |
+| Dashboard error "Missing Firebase config" | `.env.local` has the JavaScript snippet instead of `NAME=value` lines | See the table in Step 5 |
+
+### Optional: nicer emails
+Authentication → **Templates** → **Password reset** (used by Step 8's "set your password" link) → ✏ → *Sender name* `Steerly` → Save. You can do the same for *Email address verification*.
 
 ### Step 10 — Put the dashboard and website online (free hosting)
 1. Firebase console → **Build → Hosting → Get started** → click through to the end.
@@ -164,6 +207,17 @@ The original app used a different Firebase project, `prince-driving-school`, whi
     }
   }
   ```
+
+---
+
+## 2b. Offline demo on your laptop (no Firebase project needed)
+Handy for showing the full product to a driving school, including logins, booking and payments, before you pay for Blaze. Everything runs locally against the fake project `demo-steerly`.
+```powershell
+npm run emulators        # terminal 1: leave it running until "All emulators ready"
+npm run seed             # terminal 2: creates the demo Prince Driving School
+npm run admin:emulator   # terminal 2: dashboard at http://localhost:5173
+```
+Log in with phone **9000000001**, OTP **123456** (owner). Instructors 9000000002 / 9000000003, students 9000000011…9000000022. The demo data disappears when you stop the emulators.
 
 ---
 
