@@ -14,20 +14,20 @@
     "deploy": "firebase deploy --only functions"
   },
   "dependencies": {
-    "firebase-admin": "^14.5.0",
+    "firebase-admin": "^14.5.1",
     "firebase-functions": "^7.4.0",
-    "pdfkit": "^0.20.2",
+    "pdfkit": "^0.21.0",
     "razorpay": "^2.9.8"
   },
   "devDependencies": {
     "@steerly/shared": "*",
     "@types/node": "^24.13.3",
-    "@types/pdfkit": "^0.17.6",
+    "@types/pdfkit": "^0.17.7",
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
     "esbuild": "^0.28.2",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.5",
+    "vitest": "^5.1.1",
     "zod": "^4.6.7"
   }
 }
